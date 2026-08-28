@@ -30,7 +30,7 @@ Everything below is downloaded from the Hugging Face Hub. Nothing is trained her
 |---|---|
 | **Speech model** (4.13 B, the one that speaks) | [`laion/moss-tts-local-transformer-4.55b-voice-acting-v2-sft3`](https://huggingface.co/laion/moss-tts-local-transformer-4.55b-voice-acting-v2-sft3) |
 | Audio tokenizer / vocoder | [`OpenMOSS-Team/MOSS-Audio-Tokenizer-v2`](https://huggingface.co/OpenMOSS-Team/MOSS-Audio-Tokenizer-v2) |
-| Quality adapter, rank 64 | [`laion/moss-va-sft3-dpo-lora`](https://huggingface.co/laion/moss-va-sft3-dpo-lora) |
+| Quality adapter, rank 64 | [`laion/moss-va-sft3-dpo-lora-p2`](https://huggingface.co/laion/moss-va-sft3-dpo-lora-p2) — supersedes [`…-dpo-lora`](https://huggingface.co/laion/moss-va-sft3-dpo-lora) |
 | Voice-identity adapters, 500 × rank 16 | [`laion/moss-va-sft3-voice-loras`](https://huggingface.co/laion/moss-va-sft3-voice-loras) |
 | Emotion adapters, 40 × rank 16 | [`laion/moss-va-sft3-emotion-loras`](https://huggingface.co/laion/moss-va-sft3-emotion-loras) |
 | Voice-quality adapters (57 dimensions) | [`laion/moss-voicenet-dimension-loras`](https://huggingface.co/laion/moss-voicenet-dimension-loras) |
@@ -179,13 +179,34 @@ weight below is on top of that.
 
 | order | adapter | weight | why |
 |---|---|---|---|
-| 1 | `sft3_dpo:dpo` | **1.0** | general quality, the published weight |
+| 1 | `sft3_dpo:p2` | **1.0** | general quality, the published weight |
 | 2 | `sft3_voice:<profile>` | **1.0** | speaker identity. 1.0 is the trained value and has not been swept |
 | 3 | `voicenet:vn_S_CONV__high` | 0.25 | base style: conversational |
 | 4 | `voicenet:vn_S_CASU__high` | 0.5 | base style: casual |
 | 5 | `voicenet:vn_WARM__high` | 0.25 | base style: warm |
 | 6 | `burst:<label>` | 0.5 | only when the script contains a burst that has an adapter |
 | 7 | `sft3_emotion:<Emotion>` | **1.5** | the emotion retrieval picked |
+
+The quality adapter is `p2`, the best checkpoint measured in this line: reward
+0.4757 against 0.4708 for its predecessor, the highest emotion percentile of any
+preference-tuned model here (0.3541), and — uniquely — a word error rate (0.0977)
+slightly better than the supervised baseline it is built on (0.0987).
+
+### Tied weights: why twelve modules are not merged
+
+`MossTTSLocalModel.tie_weights()` makes `audio_lm_heads.N.weight` and
+`audio_embeddings.N.weight` **the same tensor**. Folding a head delta into the
+weight therefore rewrites the audio embedding too and corrupts the model — the
+adapter card measures both tensors moving by exactly 6.103515625e-05 while the
+text embedding does not move at all. Both DPO adapters carry LoRA on all twelve
+heads, so this is not hypothetical.
+
+`lora_bank.py` detects those modules (`LoraBank.TIED`) and runs them as **forward
+hooks** instead: the same arithmetic, `h + scaling·B(A(x))`, without writing to
+any stored weight. Everything else stays merged. Hooks were rejected for the
+model as a whole because 536 of them cost more in kernel launches than the
+arithmetic saves at batch 1 — but twelve is not 536, and the measured GPU
+realtime factor is unchanged at 0.99.
 
 The emotion weight of 1.5 is the operating point from the adapter card's own
 scale sweep: emotion 0.408 → 0.471, genuineness and burst blend both rise with

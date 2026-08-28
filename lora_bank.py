@@ -22,7 +22,7 @@ language model:
     burst + emotion      burst 1.0, emotion at most half the burst dose
     character            0.75
 """
-import glob, json, os, threading
+import glob, json, os, re, threading
 
 import torch
 from safetensors.torch import load_file
@@ -199,6 +199,20 @@ class LoraBank:
     # accumulating over a long session.
     RESYNC_EVERY = 25
 
+    # Modules whose weight is shared with another module and therefore must not
+    # be written to.  MossTTSLocal calls tie_weights() to make
+    # `audio_lm_heads.N.weight` and `audio_embeddings.N.weight` the *same*
+    # tensor, so folding a head delta into the weight silently rewrites the
+    # audio embedding as well and corrupts the model — the DPO adapter's own
+    # card measures both tensors moving by exactly 6.103515625e-05.  The twelve
+    # head modules are therefore run as forward hooks instead, which is the same
+    # arithmetic (h + scaling·B(A(x))) without touching any stored weight.
+    #
+    # Hooks were rejected for the model as a whole because 536 of them cost more
+    # in kernel launches than the rank-32 arithmetic saves at batch 1.  Twelve is
+    # not 536, and correctness is not optional.
+    TIED = re.compile(r"(?:^|\.)audio_(?:lm_heads|embeddings)\.\d+$")
+
     def _snapshot(self, paths):
         if not hasattr(self, "_pristine"):
             self._pristine = {}
@@ -229,7 +243,19 @@ class LoraBank:
             for mp, (A, B, s) in g.items():
                 touched.setdefault(mp, []).append((A, B, s * float(lam)))
             applied.append((name, float(lam)))
+        # tied weights cannot be merged; they are hooked instead
+        hooked = {mp: t for mp, t in touched.items() if self.TIED.search(mp)}
+        touched = {mp: t for mp, t in touched.items() if mp not in hooked}
+        if hooked:
+            if not getattr(self, "_said_hooked", False):
+                self._said_hooked = True
+                print(f"[lora] {len(hooked)} tied modules run as hooks, not merged "
+                      f"(shared weights: {sorted(hooked)[0]} …)", flush=True)
+            for mp, terms in hooked.items():
+                self._active[mp] = terms
+                self._ensure_hook(mp)
         if not touched:
+            self._merged = None
             return applied
         self._snapshot(touched.keys())
         mods = self._module_map()
@@ -254,6 +280,7 @@ class LoraBank:
         same cost as the merge.  Every RESYNC_EVERY turns the pristine host copy
         is written back instead, so bf16 rounding cannot accumulate.
         """
+        self._active.clear()          # drop any hooked (tied-weight) adapters
         touched = getattr(self, "_merged", None)
         if not touched:
             return

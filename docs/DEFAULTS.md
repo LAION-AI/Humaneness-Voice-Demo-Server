@@ -24,7 +24,7 @@ environment variable too, so nothing here needs a code edit to change.
 | `USE_LORA` | `True` |
 | `LORA_ROOTS` | `{'emotion': '/home/c4r33u19/.cache/huggingface/hub/models--TTS-AGI--moss-emotion-loras-v3/snapshots/6fb7de6247c833ef4e1686f7932432374d27218a/', 'character': '/home/c4r33u19/.cache/huggingface/hub/models--TTS-AGI--moss-character-loras-refined-public/snapshots/6f794348824f0c26cc87a2ae5c9ef828393b9b22/ …` |
 | `PROFILE_LORA_KIND` | `sft3_voice` |
-| `SFT3_DPO_LORA` | `sft3_dpo:dpo` |
+| `SFT3_DPO_LORA` | `sft3_dpo:p2` |
 | `SFT3_DPO_LAM` | `1.0` |
 | `SFT3_VOICE_LAM` | `1.0` |
 | `SFT3_EMOTION_LAM` | `1.5` |
@@ -94,7 +94,7 @@ environment variable too, so nothing here needs a code edit to change.
 | `ASSETS` | `/mnt/nvme/moss-15-v2-assets/loras` |
 | `CONTINUITY` | `the same speaker continues without interruption: identical voice, identical person, same microphone and same room.` |
 | `EIV_DIR` | `/mnt/nvme/empathic-insights-voice-small` |
-| `EMOTION_NAMES` | `{'Longing', 'Bitterness', 'Pleasure_Ecstasy', 'Pain', 'Malevolence_Malice', 'Disgust', 'Fatigue_Exhaustion', 'Interest', 'Relief', 'Intoxication_Altered_States_of_Consciousness', 'Pride', 'Impatience_ …` |
+| `EMOTION_NAMES` | `{'Teasing', 'Relief', 'Impatience_and_Irritability', 'Astonishment_Surprise', 'Contempt', 'Jealousy_and_Envy', 'Sadness', 'Contemplation', 'Sexual_Lust', 'Shame', 'Bitterness', 'Embarrassment', 'Helpl …` |
 | `HISTORY_TURNS_LOCAL` | `8` |
 | `HISTORY_TURNS_LUNA` | `40` |
 | `LLM_BASE` | `http://127.0.0.1:8790` |

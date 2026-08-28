@@ -163,7 +163,11 @@ PROFILE_LORA_KIND = os.environ.get("MOSS_PROFILE_LORA_KIND",
 SFT3_VOICE_LAM = float(os.environ.get("MOSS_SFT3_VOICE_LAM", "1.0"))
 # The general-quality adapter of the recommended three-way stack, at its
 # published weight.
-SFT3_DPO_LORA = os.environ.get("MOSS_SFT3_DPO_LORA", "sft3_dpo:dpo")
+# p2 supersedes the first DPO adapter: reward 0.4757 vs 0.4708, and the only
+# preference-tuned model in this line whose word error rate (0.0977) beats the
+# supervised baseline it is built on (0.0987), with the highest emotion
+# percentile of any of them (0.3541).  Same rank 64, alpha 128.
+SFT3_DPO_LORA = os.environ.get("MOSS_SFT3_DPO_LORA", "sft3_dpo:p2")
 SFT3_DPO_LAM = float(os.environ.get("MOSS_SFT3_DPO_LAM", "1.0"))
 # 1.5 is the published operating point from a 31-adapter scale sweep: emotion
 # 0.408 -> 0.471, genuineness and burst blend both rise with it, median word
