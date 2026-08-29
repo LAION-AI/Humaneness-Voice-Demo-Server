@@ -224,8 +224,86 @@ On top of SFT3 + DPO-p2, conditioned on the voice's own reference recording.
 
 ## Experiment 5 — the 40 emotion adapters, six weights each
 
-5 of 240 conditions complete at the time this was written. Full table in
-`sweep_emotion.json`.
+240 conditions. Averaged over all forty adapters at each weight, the cost
+of the emotion adapter rises with the weight the demo was using:
+
+| condition | WER | extra words | takes w/ extra | genuineness 0–6 | blend 0–10 | spk sim |
+|---|--:|--:|--:|--:|--:|--:|
+| all 40 emotions @0.25 | 0.036 | 0.19 | 10% | 1.13 | 3.25 | 0.548 |
+| all 40 emotions @0.5 | 0.031 | 0.13 | 8% | 1.23 | 3.22 | 0.542 |
+| all 40 emotions @0.75 | 0.034 | 0.18 | 11% | 1.25 | 3.26 | 0.528 |
+| all 40 emotions @1.0 | 0.034 | 0.12 | 7% | 1.29 | 3.37 | 0.516 |
+| all 40 emotions @1.25 | 0.036 | 0.21 | 10% | 1.28 | 3.38 | 0.507 |
+| all 40 emotions @1.5 | 0.072 | 0.70 | 11% | 1.34 | 3.39 | 0.484 |
+
+**Cheapest**
+
+| condition | WER | extra words | takes w/ extra | genuineness 0–6 | blend 0–10 | spk sim |
+|---|--:|--:|--:|--:|--:|--:|
+| Anger @0.5 | 0.000 | 0.00 | 0% | 1.29 | 2.78 | 0.578 |
+| Anger @1.5 | 0.000 | 0.00 | 0% | 0.72 | 2.17 | 0.468 |
+| Concentration @0.25 | 0.000 | 0.00 | 0% | 1.27 | 2.73 | 0.557 |
+| Confusion @0.75 | 0.000 | 0.00 | 0% | 1.19 | 2.96 | 0.576 |
+| Disappointment @1.0 | 0.000 | 0.00 | 0% | 1.54 | 3.31 | 0.493 |
+| Distress @0.5 | 0.000 | 0.00 | 0% | 1.14 | 3.67 | 0.523 |
+| Distress @0.75 | 0.000 | 0.00 | 0% | 1.29 | 2.87 | 0.488 |
+| Distress @1.0 | 0.000 | 0.00 | 0% | 1.25 | 3.19 | 0.505 |
+
+**Most expensive** — note the tail: single adapters at high weight can derail a
+take completely rather than degrade it gently.
+
+| condition | WER | extra words | takes w/ extra | genuineness 0–6 | blend 0–10 | spk sim |
+|---|--:|--:|--:|--:|--:|--:|
+| Confusion @1.5 | 1.285 | 19.30 | 20% | 1.25 | 3.59 | 0.543 |
+| Awe @1.5 | 0.128 | 0.00 | 0% | 1.19 | 4.27 | 0.439 |
+| Sexual_Lust @1.25 | 0.115 | 1.30 | 20% | 1.38 | 4.23 | 0.500 |
+| Pain @0.5 | 0.103 | 0.50 | 30% | 1.44 | 2.96 | 0.533 |
+| Distress @1.25 | 0.100 | 0.00 | 0% | 1.40 | 3.57 | 0.474 |
+| Contemplation @0.75 | 0.096 | 0.60 | 40% | 1.16 | 2.94 | 0.514 |
+| Infatuation @0.75 | 0.089 | 0.90 | 40% | 1.24 | 3.18 | 0.531 |
+| Contentment @0.25 | 0.088 | 0.00 | 0% | 0.97 | 3.36 | 0.565 |
+
+Full table in `sweep_emotion.json`.
+
+
+## Experiment 6 — combinations
+
+Built from the single-adapter results: genuineness only stays safe low, blend is
+safe anywhere, aesthetics costs genuineness, and the voice adapter buys most of
+its identity by 0.25. `q_lo` is genuineness 0.25 / blend 0.5 / aesthetics 0.5;
+`q_hi` is all three at 1.0, which is what the demo shipped.
+
+| condition | WER | extra words | takes w/ extra | genuineness 0–6 | blend 0–10 | spk sim |
+|---|--:|--:|--:|--:|--:|--:|
+| quality trio @0.25/0.5/0.5 | 0.055 | 0.20 | 10% | 0.99 | 3.17 | 0.579 |
+| quality trio @1.0 (old default) | 0.116 | 1.10 | 60% | 2.12 | 3.09 | 0.551 |
+| q_lo + voice 0.25 | 0.027 | 0.10 | 10% | 1.08 | 3.79 | 0.567 |
+| q_lo + voice 1.0 | 0.021 | 0.30 | 20% | 1.36 | 2.96 | 0.643 |
+| q_lo + voice 0.25 + emo 0.5 | 0.041 | 0.60 | 30% | 1.24 | 2.82 | 0.557 |
+| q_lo + voice 0.25 + emo 1.0 | 0.018 | 0.30 | 20% | 1.90 | 2.91 | 0.509 |
+| q_lo + voice 0.25 + emo 1.5 | 0.083 | 0.50 | 20% | 1.83 | 1.99 | 0.430 |
+| q_hi + voice 1.0 + emo 1.5 (live) | 0.273 | 1.00 | 30% | 3.21 | 2.56 | 0.523 |
+| q_lo + v0.25 + emo0.5 + 1 axis | 0.060 | 0.40 | 30% | 1.67 | 2.51 | 0.541 |
+| q_lo + v0.25 + emo0.5 + 2 axes | 0.143 | 1.50 | 50% | 2.10 | 3.07 | 0.531 |
+| q_lo + v0.25 + emo0.5 + 3 axes | 0.076 | 1.10 | 20% | 1.78 | 2.99 | 0.528 |
+| q_lo + v0.25 + emo0.5 + burst | 0.008 | 0.10 | 10% | 1.13 | 3.27 | 0.537 |
+| proposed default | 0.037 | 0.40 | 30% | 1.09 | 2.52 | 0.564 |
+| proposed default + axis | 0.048 | 0.50 | 40% | 1.58 | 2.43 | 0.562 |
+
+Three things come out of this table.
+
+**The stack the demo shipped is the worst row in it** for intelligibility —
+word error 0.273 against 0.008 for the best combination. It also scores the
+*highest* genuineness of any condition measured (3.21). That is a real
+trade-off, not a mistake: the stack does make the voice sound less rehearsed,
+and it does so by loosening exactly the control that keeps it on script.
+
+**Turning the same adapters down recovers almost everything.** The same five
+adapter families at genuineness 0.25 / blend 0.5 / aesthetics 0.5 / voice 0.25 /
+emotion 1.0 give word error 0.018 with genuineness still at 1.90.
+
+**Delivery axes stack badly.** One costs little; two took word error from 0.041
+to 0.143 and put invented words in half the takes.
 
 
 ## Throughput

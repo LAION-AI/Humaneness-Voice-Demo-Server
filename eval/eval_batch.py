@@ -103,6 +103,41 @@ def main():
     elif a.set == "emotion":
         for n in adapters_of("sft3_emotion"):
             todo += [(f"{n} @{w}", [(f"sft3_emotion:{n}", w)]) for w in scales]
+    elif a.set == "combo":
+        # built from the single-adapter results: genuineness is only safe low,
+        # blend is safe anywhere, esthetics costs genuineness, voice buys
+        # identity cheaply at 0.25.
+        G, B, E = ("sft3_quality:genuineness_high", "sft3_quality:blend_high",
+                   "sft3_quality:esthetics_high")
+        V = "sft3_voice:emolia_c1699"
+        EM = "sft3_emotion:Amusement"
+        q_lo = [(G, 0.25), (B, 0.5), (E, 0.5)]
+        q_hi = [(G, 1.0), (B, 1.0), (E, 1.0)]
+        todo = [
+            ("quality trio @0.25/0.5/0.5", q_lo),
+            ("quality trio @1.0 (old default)", q_hi),
+            ("q_lo + voice 0.25", q_lo + [(V, 0.25)]),
+            ("q_lo + voice 1.0", q_lo + [(V, 1.0)]),
+            ("q_lo + voice 0.25 + emo 0.5", q_lo + [(V, 0.25), (EM, 0.5)]),
+            ("q_lo + voice 0.25 + emo 1.0", q_lo + [(V, 0.25), (EM, 1.0)]),
+            ("q_lo + voice 0.25 + emo 1.5", q_lo + [(V, 0.25), (EM, 1.5)]),
+            ("q_hi + voice 1.0 + emo 1.5 (live)", q_hi + [(V, 1.0), (EM, 1.5)]),
+            ("q_lo + v0.25 + emo0.5 + 1 axis",
+             q_lo + [(V, 0.25), (EM, 0.5), ("sft3_voicenet:VALS_high", 0.5)]),
+            ("q_lo + v0.25 + emo0.5 + 2 axes",
+             q_lo + [(V, 0.25), (EM, 0.5), ("sft3_voicenet:VALS_high", 0.5),
+                     ("sft3_voicenet:VFLX_high", 0.5)]),
+            ("q_lo + v0.25 + emo0.5 + 3 axes",
+             q_lo + [(V, 0.25), (EM, 0.5), ("sft3_voicenet:VALS_high", 0.5),
+                     ("sft3_voicenet:VFLX_high", 0.5), ("sft3_voicenet:EMPH_high", 0.5)]),
+            ("q_lo + v0.25 + emo0.5 + burst",
+             q_lo + [(V, 0.25), (EM, 0.5), ("burst:chuckle", 0.25)]),
+            ("proposed default",
+             [(G, 0.25), (B, 0.5), (V, 0.25), (EM, 0.5)]),
+            ("proposed default + axis",
+             [(G, 0.25), (B, 0.5), (V, 0.25), (EM, 0.5),
+              ("sft3_voicenet:VALS_high", 0.5)]),
+        ]
     else:
         raise SystemExit("unknown --set")
 
