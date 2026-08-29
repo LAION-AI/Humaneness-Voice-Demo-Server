@@ -108,8 +108,9 @@ class Wiki:
                       "it is never a default", flush=True)
         except Exception as e:                      # noqa: BLE001 - never fail start-up
             self.error = f"{type(e).__name__}: {e}"
-            print(f"[levers] no wiki coefficients ({self.error}); steering and guidance "
-                  "will be refused for want of a measured setting", flush=True)
+            print(f"[levers] no wiki coefficients ({self.error}); `auto` will not reach "
+                  "for a lever, and an explicitly requested one runs on its measured "
+                  "family default rather than this attribute's own row", flush=True)
 
     def get(self, name):
         k = attr_key(name)
@@ -165,6 +166,7 @@ class Plan:
         elif self.wants_cfg:
             self.mode = "adapter+cfg" if self.has_adapter else "cfg"
         else:
+            self.operating_point = None   # no lever ran, so no point was used
             # `drop_adapter` is a record of what the app already did to the adapter list,
             # not an instruction that can be taken back: by the time a lever is refused
             # inside the engine the adapter has been gone for some time.  So a lever-only
@@ -234,10 +236,32 @@ class Plan:
             ("  | " + "; ".join(self.reasons)) if self.reasons else "")
 
 
+def steering_key(name, fam=None):
+    """A name the director knows -> the key in the steering-vector table.
+
+    The wiki carries this per attribute, but the mapping is mechanical and the resolver has
+    to work with no wiki at all, so it is computed here too.  Kept identical in behaviour to
+    `dim_key_of` in the combination study, which is what chose the vectors that were scored.
+    """
+    fam = fam or family(name)
+    if fam == "emo":
+        return f"emo:{name}"
+    if fam == "vn":
+        if str(name).endswith("_high"):
+            return f"vn:{name[:-5]}"
+        if str(name).endswith("_low"):
+            return f"vn:{name[:-4]}"
+        return f"vn:{name}"
+    if fam == "qual":
+        return {"genuineness_high": "q:genuineness", "blend_high": "q:blend",
+                "esthetics_high": "vn:ESTH"}.get(name)
+    return None
+
+
 def _steer_components(rec, wiki, name, fam, alpha_scale=1.0):
     """The wiki recipe's steering block, scaled, with the numbness subtraction attached."""
     out = []
-    for s in rec.get("steer") or []:
+    for s in (rec or {}).get("steer") or []:
         if not s.get("layers"):
             continue
         out.append({"key": s["key"],
@@ -247,15 +271,17 @@ def _steer_components(rec, wiki, name, fam, alpha_scale=1.0):
     return out
 
 
-def _default_steer(entry, wiki, fam, alpha):
-    """A steering component for an attribute the wiki has no *steering* recipe for.
+def _default_steer(entry, name, fam, alpha):
+    """A steering component for an attribute with no *steering* recipe to read.
 
-    Only reached when the wiki DOES have an operating point for the attribute but that point
-    happens not to use steering, and the director explicitly asked for a steering mode.  The
-    layers come from the attribute's own ranking, k from its family.
+    Two ways to get here, and both are an explicit request rather than `auto`: the wiki has
+    an operating point for this attribute but it does not use steering, or there is no wiki
+    row at all.  Neither number is invented -- alpha = 0.10 at the attribute's own top layer
+    is the measured free setting from the steering study, and k comes from the same study's
+    per-family finding.  The layers come from the ranking embedded in the vector pack, so
+    this path needs the pack and nothing else.
     """
-    key = entry.get("steering_key")
-    layers = (entry.get("balanced") or entry.get("high_effect") or {})
+    key = (entry or {}).get("steering_key") or steering_key(name, fam)
     k = config.STEER_K.get(fam, 1)
     return {"key": key, "alpha": alpha, "taps": f"top{k}", "layers": None, "_k": k}
 
@@ -319,12 +345,6 @@ def plan(requested, name, strength, *, wiki, pack, active_delivery_adapters,
 
     have_wiki = bool(wiki is not None and wiki.available)
     entry = wiki.get(name) if have_wiki else None
-    if entry is None and (want_steer or want_cfg):
-        p.mode = "adapter"
-        p.note("no wiki entry for this attribute" if have_wiki
-               else "wiki coefficients unavailable "
-                    f"({getattr(wiki, 'error', 'not loaded')})")
-        return p
 
     # ---- pick the operating point ---------------------------------------
     if p.strength == "strong":
@@ -335,12 +355,35 @@ def plan(requested, name, strength, *, wiki, pack, active_delivery_adapters,
         point, rec = "balanced", (entry or {}).get("balanced")
         if rec is None:
             point, rec = "high_effect", (entry or {}).get("high_effect")
-    if rec is None and (want_steer or want_cfg):
-        p.mode = "adapter"
-        p.note("no measured operating point for this attribute clears the guardrails; "
-               "the levers are not offered at a guessed setting")
-        return p
-    p.operating_point = point if rec else None
+
+    # ---- EACH LEVER IS GATED ON WHAT IT ACTUALLY USES --------------------
+    # Guidance needs no steering vectors and no per-attribute row: `g` has a family
+    # default measured in the CFG study (3.0 for emotion, 2.5 for delivery, at word error
+    # <= 0.20).  Steering needs a direction and the layers to put it at, which only the
+    # vector pack has.  Gating them together meant the 0.4 MB file was holding up the lever
+    # that does not need the 5.3 MB one -- reported by the demo team, and they were right.
+    #
+    # `auto` is the exception and stays strict.  It is a claim about what was MEASURED for
+    # this attribute, so with no row to read it makes no claim and asks for no lever.  An
+    # explicitly requested mode is an operator or a director overriding that, and it runs on
+    # the documented family default with `operating_point: "family_default"` in the payload
+    # and a reason line saying so.  A default from the study is not a guess; what is refused
+    # is inventing a per-attribute number that nobody measured.
+    explicit = p.requested != "auto"
+    if rec is None:
+        why = ("no wiki entry for this attribute" if have_wiki else
+               "wiki coefficients unavailable "
+               f"({getattr(wiki, 'error', 'not loaded')})") if entry is None else \
+            "no measured operating point for this attribute clears the guardrails"
+        if not explicit:
+            p.mode = "adapter"
+            p.note(why + "; auto makes no claim without one")
+            return p
+        p.note(why + "; running the explicitly requested lever on its documented family "
+                     "default instead, which is a measured setting but not this "
+                     "attribute's own")
+        point = "family_default"
+    p.operating_point = point if (rec or explicit) else None
 
     # ---- family policy ---------------------------------------------------
     if p.requested == "auto":
@@ -391,14 +434,15 @@ def plan(requested, name, strength, *, wiki, pack, active_delivery_adapters,
         if not comps:
             # the wiki's point for this attribute does not use steering; fall back to the
             # attribute's own top-k layers at the family default alpha
-            d = _default_steer(entry, wiki, fam, config.STEER_ALPHA * alpha_scale)
-            layers = pack.taps_for(d["key"], d.pop("_k"))
+            d = _default_steer(entry, name, fam, config.STEER_ALPHA * alpha_scale)
+            layers = pack.taps_for(d["key"], d.pop("_k")) if d["key"] else []
             if layers:
                 d["layers"] = layers
                 comps = [d]
-                p.note(f"the {point} recipe for this attribute does not use steering; "
-                       f"applying the family default alpha {d['alpha']:+.2f} at its own "
-                       f"top-{len(layers)} layers")
+                p.note(("no steering recipe to read" if rec is None else
+                        f"the {point} recipe for this attribute does not use steering")
+                       + f"; applying the measured family default alpha {d['alpha']:+.2f} "
+                         f"at its own top-{len(layers)} layers")
         comps = [c for c in comps if pack.has(c["key"])]
         if fam == "emo" and comps and config.NUMBNESS_SUBTRACTION != "off":
             nb = _numbness(wiki, pack)
@@ -429,8 +473,9 @@ def plan(requested, name, strength, *, wiki, pack, active_delivery_adapters,
         g = float((rec or {}).get("cfg", {}).get("g") or 0) or config.CFG_G.get(fam, 2.5)
         if g <= 1.0:
             g = config.CFG_G.get(fam, 2.5)
-            p.note(f"the {point} recipe does not use guidance; applying the family default "
-                   f"g = {g}")
+            p.note((f"the {point} recipe does not use guidance" if rec is not None else
+                    "no guidance recipe to read")
+                   + f"; applying the measured family default g = {g}")
         g = max(config.CFG_G_MIN, min(g, config.CFG_G_MAX))
         p.guidance = g
         p.streaming = False

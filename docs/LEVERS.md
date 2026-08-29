@@ -249,16 +249,36 @@ emotion; and spend guidance only when the first two have not reached the band.
 
 ## 8. Where the assets come from
 
-Two files are needed, and **neither is in this repository**.
+Two files, neither of them in git history. Both are published as **release assets on this
+repository**, which is public, so no token is needed:
 
-| file | size | what it is |
-|---|--:|---|
-| `p3_vectors_server.npz` | **5.3 MB** | 99 attributes × their own top 5 layers × 2560, float32 |
-| `coefficients.json` | ~0.4 MB | the measured operating point for each of 60 attributes |
+```bash
+B=https://github.com/LAION-AI/Humaneness-Voice-Demo-Server/releases/download/assets-2026-08-29
+
+curl -fL -o /mnt/nvme/moss-15-v2-assets/wikiskills/coefficients.json --create-dirs \
+  $B/coefficients.json
+curl -fL -o /mnt/nvme/moss-15-v2-assets/steering/p3_vectors_server.npz --create-dirs \
+  $B/p3_vectors_server.npz
+```
+
+Those are the paths `config.WIKI_COEFFICIENTS` and `config.STEER_PACK` already default to.
+Keep the `-f`: without it curl writes an HTTP error page to the target path and the failure
+surfaces later as a puzzling parse error. Check the hashes, then run
+`python setup/check_levers.py`.
+
+| file | bytes | sha256 | what it is |
+|---|--:|---|---|
+| `coefficients.json` | 324,511 | `7e029f0e…13e840` | the measured operating point for each of 60 attributes |
+| `p3_vectors_server.npz` | 5,334,470 | `d81b6971…6de78f7` | 99 attributes × their own top 5 layers × 2560, float32 |
+
+> The research log `LAION-AI/Voice-Acting-Pipeline-WIP` is **private**, so a `raw`
+> `githubusercontent` link into it returns 404 for anyone outside it. That is why these are
+> mirrored here rather than linked there.
 
 The research library the vectors are distilled from is **112 MB** — three difference tables
 of 99 × 38 × 2560 — and none of it belongs in git. `setup/build_steering_pack.py` reduces it
-to the one table and the few layers the server can actually reach:
+to the one table and the few layers the server can actually reach, on a machine that has the
+research artefacts (they are not on the demo box):
 
 ```bash
 python setup/build_steering_pack.py \
@@ -275,12 +295,43 @@ quantise it to a few significant bits.
 `wikiskills/code/build_wikiskills.py` in the research log, alongside one pattern page per
 attribute. It is generated rather than written because a hand-typed table drifts.
 
-`MOSS_STEER_PACK` and `MOSS_WIKI_COEFFICIENTS` point at them. **With neither file present
-this server behaves exactly as it did before generation modes existed**: every mode that
-needs them degrades to `adapter`, `/api/state` reports them as unavailable, and the response
-payload carries the reason. A dial that reads a value while the thing it names is switched
-off is worse than no dial ([`LEARNINGS.md`](LEARNINGS.md)), so the degrade is always
-reported and never silent.
+`MOSS_STEER_PACK` and `MOSS_WIKI_COEFFICIENTS` point at them.
+
+**Each lever is gated on what it actually uses, and only that.** The first version of this
+gated both on the coefficient table, which meant the 0.4 MB download was holding up the lever
+that needs no vectors at all — reported by the demo team on PR #3, and they were right.
+
+| you have | `auto` | `adapter` | `adapter+cfg`, `cfg` | `adapter+steer`, `steer` |
+|---|---|---|---|---|
+| neither file | `adapter` | ✅ | ✅ family default | `adapter` |
+| coefficients only | measured per attribute | ✅ | ✅ measured `g` | `adapter` |
+| vector pack only | `adapter` | ✅ | ✅ family default | ✅ family default |
+| both | measured per attribute | ✅ | ✅ | ✅ |
+
+* **Guidance needs neither asset.** `g` has a family default measured in the CFG study — 3.0
+  for emotion, 2.5 for delivery, at word error ≤ 0.20 — and the neutralised branch is built
+  from the turn's own prompt. So a box with no assets at all can still test guidance, the
+  neutralised branch and the director's tool use.
+* **Steering needs the vector pack and nothing else.** The pack carries the per-dimension
+  layer ranking embedded in it, so α = 0.10 at the attribute's own top-k layers — the
+  measured free setting — is reachable without the coefficient table.
+* **The coefficient table is what `auto` reads**, and what turns a family default into this
+  attribute's own measured operating point.
+
+**`auto` stays strict.** It is a claim about what was measured for this attribute, so with no
+row to read it makes no claim and asks for no lever. An explicitly requested mode is an
+operator or a director overriding that, and it runs on the documented family default with
+`"operating_point": "family_default"` in the payload and a reason line saying so. **A default
+from the study is not a guess**; what is refused is inventing a per-attribute number nobody
+measured.
+
+The refusals that are *findings* rather than missing recipes survive with no coefficient
+table at all: steering is still refused on a quality axis and on a `_low` tail, and a
+delivery adapter and a delivery steering vector still never both run.
+
+A dial that reads a value while the thing it names is switched off is worse than no dial
+([`LEARNINGS.md`](LEARNINGS.md)), so every degrade is reported in `/api/state` and in the
+response payload, never silent.
 
 ---
 
@@ -336,6 +387,11 @@ the coefficient table records.
 
 ## What has not been tested
 
+* **`adapter`-mode bit-identity has not been byte-checked.** The offline check shows the
+  injector is a genuine no-op object on that path and the loop shape is untouched, which is
+  evidence and not proof. `setup/ab_codes.py` does the actual comparison — same seed, same
+  prompt, same adapter set, on two checkouts, comparing the generated **code tensors** rather
+  than the audio, since the decode is deterministic given identical codes.
 * **None of this has run on the demo box.** `setup/check_levers.py` verifies the parts that
   do not need 4.55 B parameters — that the table and the vector pack agree, that the resolver
   refuses what the measurements say it should, that the neutralised prompt keeps the
