@@ -443,9 +443,47 @@ occupy 8.8 MB.
 | `score_engine.py` | emotion and voice-quality scoring for `/studio` |
 | `asr_engine.py`, `sim_engine.py`, `vc_engine.py`, `sidon_restore.py` | speech recognition, speaker similarity, optional voice conversion and restoration |
 | `index.html`, `studio.html`, `report.html` | the three pages |
-| `setup/` | corpus extraction, retrieval index, profile traits |
+| `levers.py` | which of the three generation levers this turn gets, and why |
+| `steer_engine.py` | the steering vectors and their injection points |
+| `setup/` | corpus extraction, retrieval index, profile traits, the steering pack, `check_levers.py` |
 | `eval/` | consistency and completeness checks |
-| `docs/` | [`ADAPTERS.md`](docs/ADAPTERS.md) (the adapter protocol), generated defaults, verbatim system prompts, measurement log |
+| `docs/` | [`ADAPTERS.md`](docs/ADAPTERS.md) (the adapter protocol), [`LEVERS.md`](docs/LEVERS.md) (the generation modes), generated defaults, verbatim system prompts, measurement log |
+
+---
+
+## Three levers, not one
+
+Loading adapters and writing a good prompt used to be the only way to shape a
+performance here. Two more levers have since been measured on this checkpoint —
+a **steering vector** added to the hidden state while the model speaks, and
+**classifier-free guidance** on the delivery condition — together with how all
+three combine. They are exposed as switchable generation modes, and the director
+picks between them with a `choose_generation_mode` tool call.
+
+The best single lever **flips by family**, which is the whole reason there is a
+mode selector rather than a global switch:
+
+| family | adapter | steering | guidance |
+|---|--:|--:|--:|
+| emotion | +0.077 (t 2.8) | **+0.384** (t 9.4) | +0.050 (t 1.8) |
+| delivery | +0.377 (t 7.1) | **+0.614** (t 9.6) | +0.026 (t 0.4) |
+| quality | **+0.399** (t 6.0) | +0.006 (t 0.0) | +0.062 (t 0.9) |
+
+So `auto` — the default — gives an **emotion** the adapter and the steering
+vector together, because on emotions the two are cleanly additive; gives a
+**delivery axis** the adapter alone, because there the two are significantly
+*sub*-additive and doing the same job; gives a **quality axis** the adapter
+alone, because steering does not move it at all; and never spends guidance,
+which costs **1.93×** and therefore does not stream.
+
+Every mode is switchable off, and both new levers need an asset that is not in
+this repository — a 5.3 MB vector pack and the measured coefficient table. With
+neither present the server behaves exactly as it did before, and says so in
+`/api/state` and in every response payload.
+
+> The evidence for each of those defaults, what the modes cost, why guidance is
+> rendered rather than streamed, and where the assets come from, are in
+> [`docs/LEVERS.md`](docs/LEVERS.md).
 
 ---
 

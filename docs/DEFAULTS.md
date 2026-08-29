@@ -72,6 +72,39 @@ environment variable too, so nothing here needs a code edit to change.
 | `CROSSFADE_S` | `0.06` |
 | `CTX_FRAMES` | `160` |
 
+## Generation modes
+
+Three levers exist, not one: the adapter merge weight this server always had, a steering
+vector added to the hidden state, and classifier-free guidance. The write-up and the
+evidence for every default here are in [`LEVERS.md`](LEVERS.md).
+
+| setting | value | why |
+|---|---|---|
+| `GEN_MODE` | `auto` | which levers run; `auto` resolves per family from the measurements |
+| `STEER_ENABLED` | `True` | steering off entirely when false |
+| `CFG_ENABLED` | `True` | guidance off entirely when false |
+| `AGENT_PICKS_MODE` | `True` | may the director choose the mode, or does `GEN_MODE` decide |
+| `DELIVERY_LEVER` | `adapter` | on a delivery axis the adapter and the steering vector are sub-additive (-0.164, t -3.7); this picks which one runs |
+| `STEER_PACK` | `/mnt/nvme/moss-15-v2-assets/steering/p3_vectors_server.npz` | the 5.3 MB distilled vector pack; **not in this repository**, see docs/LEVERS.md |
+| `STEER_TAP_RANK` | `/mnt/nvme/moss-15-v2-assets/steering/tap_rank.json` | only needed when `STEER_PACK` points at the raw 112 MB research file |
+| `STEER_PACK_K` | `5` | layers kept per attribute; 5 covers every shipped k |
+| `WIKI_COEFFICIENTS` | `/mnt/nvme/moss-15-v2-assets/wikiskills/coefficients.json` | the measured operating point per attribute; absent, the levers are refused rather than guessed |
+| `STEER_ALPHA` | `0.1` | the free setting: emotion percentile 0.4354 -> 0.5840 with word error falling |
+| `STEER_ALPHA_CEILING` | `0.15` | per component; half the 0.3 at which steering collapses |
+| `STEER_REALISED_CEILING` | `0.25` | per layer after components sum; the measured recipes reach 0.1926 |
+| `STEER_K` | `{'emo': 1, 'vn': 3, 'qual': 0}` | layers per attribute: emotion is free only at 1, quality breaks at 2, delivery wants 3-5 |
+| `STRENGTH_ALPHA_SCALE` | `{'gentle': 0.5, 'moderate': 1.0, 'strong': 1.0}` | the director's three words; it never sends a number |
+| `NUMBNESS_SUBTRACTION` | `with_steer` | `with_steer` attaches -0.10 of Emotional_Numbness to a steered emotion: +0.60 genuineness (t 9.64) at no cost in emotion |
+| `CFG_G` | `{'emo': 3.0, 'vn': 2.5, 'qual': 2.5}` | g = 3.0 for emotion, 2.5 for delivery, at word error <= 0.20 |
+| `CFG_G_MIN` | `1.5` | below g = 1 guidance actively hurts (-0.0370 at 0.5, t -2.56) |
+| `CFG_G_MAX` | `3.0` | the top of the measured ladder |
+| `CFG_COST_FACTOR` | `1.93` | measured at batch 1, 1.89-1.94 over four cells; this is why guidance does not stream |
+| `CFG_STEER_BRANCH` | `both` | steering both branches keeps 82 % of the effect and returns 0.209 of word error and 0.75 of genuineness |
+| `QUALITY_AXES` | `('genuineness_high', 'blend_high', 'esthetics_high')` | the three perceptual axes, by the name the director uses |
+
+With no `STEER_PACK` and no `WIKI_COEFFICIENTS` on disk the server behaves exactly as it
+did before generation modes existed: every mode that needs them degrades to `adapter`,
+and `/api/state` and the response payload both say so.
 ## Profiles & caches
 
 | setting | value |

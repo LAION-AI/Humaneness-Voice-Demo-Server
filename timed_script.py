@@ -224,3 +224,38 @@ def general_line(general, seconds, lang_code, reads_as=None):
         names = names.replace("_", " ").lower()
         g += f"; reads as {names}"
     return f"{g}; {seconds:.1f}s, {lang_code}."
+
+
+def neutralise(tagged):
+    """The same timed script with its delivery directions removed, and nothing else changed.
+
+    This is the "unconditional" half of a classifier-free-guidance pair.  Only the affect
+    leaves: every round bracket WITHOUT a number is a direction and goes; every round bracket
+    WITH one is a vocal burst and stays; the square brackets carrying durations and pauses
+    stay; the words are untouched.  The arithmetic is therefore identical -- a direction is
+    zero seconds long -- so both branches carry the same `Tokens` and the guidance difference
+    is about affect and nothing else.
+
+    The format's own rule is what makes this safe: square bracket = seconds, round bracket
+    *with* a number = a burst, round bracket *without* = a direction (see this module's
+    header).  A cue that picked up a number would already have been read as a burst by
+    `parse`, so nothing that survives here was ever a direction.
+
+    The neutralised prompt is in distribution: 20 % of the CFG-DPO corpus had its instruction
+    words removed and 15-30 % of every supervised round rendered scripts without directions.
+    """
+    s = str(tagged or "")
+    keep = [(m.start(), m.end()) for m in _BURST_RE.finditer(s)]
+    cut = []
+    for m in _CUE_RE.finditer(s):
+        if any(a <= m.start() < b for a, b in keep):
+            continue
+        cut.append((m.start(), m.end()))
+    if not cut:
+        return " ".join(s.split())
+    out, pos = [], 0
+    for a, b in cut:
+        out.append(s[pos:a])
+        pos = b
+    out.append(s[pos:])
+    return " ".join("".join(out).split())

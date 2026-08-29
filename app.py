@@ -17,7 +17,9 @@ from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 
 import config
+import levers
 import lora_bank
+import steer_engine
 from llm_agent import VOICE_TOOL, LLMAgent
 from lora_bank import LoraBank
 from tts_engine import TTSEngine
@@ -32,7 +34,11 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 app = FastAPI(title="MOSS Voice Acting")
 STATE = {"tts": None, "bank": None, "agent": None, "lora": None, "asr": None,
          "agents": {}, "codebook": None, "vc": None, "sim": None,
-         "score": None, "profiles": {}, "error": None}
+         "score": None, "profiles": {}, "error": None,
+         # the second and third levers: the measured coefficient table and the
+         # steering vectors.  Either may be absent, in which case the modes that
+         # need it degrade to `adapter` and the payload says so.
+         "wiki": None, "vectors": None}
 
 
 def _frame(tag: int, payload: bytes) -> bytes:
@@ -126,6 +132,13 @@ def _boot():
             lb.discover(config.LORA_ROOTS)
             tts.lora = lb
             STATE["lora"] = lb
+        # The other two levers.  Both are optional assets: with neither present this
+        # server behaves exactly as it did before generation modes existed.
+        STATE["wiki"] = levers.Wiki()
+        if config.STEER_ENABLED:
+            vp = steer_engine.VectorPack(device=str(tts.device))
+            STATE["vectors"] = vp
+            tts.vectors = vp
         tts.warmup()
         # speech recognition lives on the other card, next to the language model
         # Both of these load on the second card.  They must load one after the
@@ -249,6 +262,34 @@ async def state():
             STATE["lora"].repos if STATE["lora"] else {}),
         "llm": await agent.health() if agent else False,
         "sr": STATE["tts"].sr if STATE["tts"] else None,
+        # What the three levers can actually do on this box, so the UI never offers
+        # a mode that is not wired up.
+        "levers": {
+            "mode": config.GEN_MODE,
+            "modes": list(levers.ALL_MODE_WORDS),
+            "strengths": list(levers.STRENGTHS),
+            "agent_picks_mode": config.AGENT_PICKS_MODE,
+            "steer": {
+                "enabled": config.STEER_ENABLED,
+                "available": bool(STATE["vectors"] and STATE["vectors"].available),
+                "dimensions": len(STATE["vectors"].names) if STATE["vectors"] else 0,
+                "error": STATE["vectors"].error if STATE["vectors"] else "not loaded",
+                "alpha": config.STEER_ALPHA,
+                "alpha_ceiling": config.STEER_ALPHA_CEILING,
+            },
+            "cfg": {
+                "enabled": config.CFG_ENABLED,
+                "cost_factor": config.CFG_COST_FACTOR,
+                "streams": False,
+                "g": config.CFG_G,
+            },
+            "wiki": {
+                "available": bool(STATE["wiki"] and STATE["wiki"].available),
+                "attributes": len(STATE["wiki"].attributes) if STATE["wiki"] else 0,
+                "error": STATE["wiki"].error if STATE["wiki"] else "not loaded",
+            },
+            "delivery_lever": config.DELIVERY_LEVER,
+        },
     }
 
 
@@ -724,7 +765,51 @@ async def turn(req: Request):
                 names = {n for n, _ in forced}
                 specs = [x for x in specs if x[0] not in names] + forced
 
-        yield _ev({"type": "llm", "reply": out["reply"], "general": out["general"],
+        # ---- 2c. which of the three levers pushes it ----------------------
+        # `voice` and `style` above chose WHAT to push.  This chooses whether the
+        # adapter does it alone (today's behaviour), whether a steering vector is
+        # added to the hidden state, or whether guidance runs the model twice per
+        # frame.  levers.py owns the policy and every rule in it is a measurement.
+        pf = out.get("perform") or {}
+        # Which attribute is being pushed.  The director may name one explicitly;
+        # otherwise it is whatever it already chose — the emotion first, because a
+        # delivery adapter is already doing its own job, and the delivery axis only
+        # if no emotion is in play.
+        vsel = out.get("voice") or {}
+        style_first = next((it.get("adapter") for it in (out.get("style") or [])
+                            if isinstance(it, dict) and it.get("adapter")), None)
+        attr_name = (pf.get("dimension")
+                     or (retr or {}).get("emotion")
+                     or (vsel.get("emotion") if vsel.get("mode") == "emotion" else None)
+                     or style_first)
+        # The adapter in this turn's plan that carries that attribute, if any: a
+        # lever-only mode drops exactly that one and leaves the rest of the stack
+        # (DPO, profile, quality) alone, which is what `lora_w = 0` meant in the study.
+        _prefix = {"emo": "sft3_emotion:", "vn": "sft3_voicenet:",
+                   "qual": "sft3_quality:"}.get(levers.family(attr_name) or "")
+        attr_adapter = None
+        if _prefix:
+            want = _prefix + str(attr_name)
+            attr_adapter = next((n for n, _ in specs if n == want), None)
+        req_mode = body.get("gen_mode")
+        if not req_mode:
+            req_mode = pf.get("mode") if config.AGENT_PICKS_MODE else "auto"
+            if (req_mode or "auto") == "auto" and config.GEN_MODE != "auto":
+                req_mode = config.GEN_MODE      # the server pins it
+        plan = levers.plan(
+            req_mode, attr_name, pf.get("strength"),
+            wiki=STATE["wiki"],
+            pack=STATE["vectors"],
+            active_delivery_adapters={n.split(":", 1)[-1] for n, _ in specs
+                                      if n.startswith("sft3_voicenet:")},
+            attribute_adapter=attr_adapter,
+            cfg_available=bool(out.get("general_unc")))
+        if plan.drop_adapter:
+            specs = [x for x in specs if x[0] != plan.drop_adapter]
+        print(plan.log_line(), flush=True)
+
+        yield _ev({"type": "llm", "levers": plan.payload(),
+                   "reply": out["reply"], "general": out["general"],
                    "script": out["script"], "voice": out.get("voice"),
                    "chosen": chosen, "llm_ms": round(llm_ms, 1),
                    "select_ms": round(sel_ms, 1), "language": out.get("language"),
@@ -779,7 +864,9 @@ async def turn(req: Request):
                         script=out["script"], general=out["general"],
                         strip=_A._strip_tags,
                         language=spoken, ref_codes=ref_codes, lora_specs=specs,
-                        speed=speed,
+                        speed=speed, lever_plan=plan,
+                        general_unc=(out.get("general_unc")
+                                     if plan.wants_cfg else None),
                         reads_as=((retr or {}).get("emotion")
                                   or (out.get("voice") or {}).get("emotion")),
                         max_new_tokens=body.get("max_new_tokens"),
