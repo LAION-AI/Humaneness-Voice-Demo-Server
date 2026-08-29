@@ -92,6 +92,43 @@
   #lat hr{border:0;border-top:1px solid var(--line);margin:8px 0}
   #bar{height:3px;background:var(--panel2);border-radius:2px;overflow:hidden;margin-top:9px}
   #bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .2s}
+  #lat h2 button{background:none;border:0;color:var(--dim);cursor:pointer;font:inherit;
+       padding:0 2px;line-height:1}
+  #lat h2 button:hover{color:var(--fg)}
+  #lat.folded #latbody{display:none}
+  #lat.folded{padding-bottom:9px}
+  /* adapter overlay */
+  #adpwrap{position:fixed;inset:0;background:rgba(6,8,12,.72);backdrop-filter:blur(3px);
+       display:none;z-index:60;align-items:center;justify-content:center;padding:24px}
+  #adpwrap.on{display:flex}
+  #adp{background:var(--panel);border:1px solid var(--line);border-radius:14px;
+       width:min(940px,100%);max-height:86vh;display:flex;flex-direction:column;
+       box-shadow:0 18px 60px rgba(0,0,0,.6)}
+  #adp header{display:flex;align-items:center;gap:12px;padding:14px 18px;
+       border-bottom:1px solid var(--line)}
+  #adp header h3{margin:0;font-size:14px;font-weight:600}
+  #adp header .sp{flex:1}
+  #adp input[type=search]{background:var(--panel2);border:1px solid var(--line);color:var(--fg);
+       border-radius:8px;padding:6px 10px;font:13px/1.3 inherit;width:230px}
+  #adp .body{overflow-y:auto;padding:6px 18px 18px}
+  #adp .grp{margin-top:16px}
+  #adp .grp h4{margin:0 0 3px;font-size:12px;letter-spacing:.7px;text-transform:uppercase;
+       color:var(--accent)}
+  #adp .grp p{margin:0 0 9px;color:var(--dim);font-size:12px}
+  #adp .row{display:grid;grid-template-columns:210px 1fr 52px;align-items:center;gap:12px;
+       padding:3px 0;font-size:12.5px}
+  #adp .row .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #adp .row .nm i{color:var(--dim);font-style:normal;font-size:11px;display:block;
+       overflow:hidden;text-overflow:ellipsis}
+  #adp .row b{font-family:var(--mono);font-size:11.5px;text-align:right;font-weight:500}
+  #adp .row.act b{color:var(--accent2)}
+  #adp .row input[type=range]{width:100%}
+  #adp footer{border-top:1px solid var(--line);padding:11px 18px;display:flex;gap:10px;
+       align-items:center;background:transparent}
+  #adp footer .sp{flex:1}
+  #adp button.b{background:var(--panel2);border:1px solid var(--line);color:var(--fg);
+       border-radius:8px;padding:6px 13px;cursor:pointer;font:13px inherit}
+  #adp button.b:hover{border-color:var(--accent)}
   @media (max-width:900px){#lat{display:none}}
 </style>
 </head>
@@ -102,12 +139,33 @@
   <span class="sub" id="status">connecting…</span>
   <a href="/studio" class="reportlink" style="color:var(--accent2)">Voice Studio →</a>
   <a href="/report" target="_blank" class="reportlink">Messungen →</a>
+  <button id="adpbtn" class="reportlink" style="background:none;border:0;cursor:pointer;
+          font:inherit;color:var(--accent)">Adapter →</button>
 </header>
+
+<div id="adpwrap">
+  <div id="adp">
+    <header>
+      <h3>Adapter</h3>
+      <span class="sp"></span>
+      <input type="search" id="adpq" placeholder="filtern…">
+    </header>
+    <div class="body" id="adpbody">lade…</div>
+    <footer>
+      <span id="adpn" style="color:var(--dim);font-size:12px"></span>
+      <span class="sp"></span>
+      <button class="b" id="adpreset">Auf Standard zurück</button>
+      <button class="b" id="adpclose">Schließen</button>
+    </footer>
+  </div>
+</div>
 
 <main><div id="chat"></div></main>
 
 <div id="lat">
-  <h2><span>Latency</span><span id="lstate">idle</span></h2>
+  <h2><span>Latency</span><span><span id="lstate">idle</span>
+      <button id="latfold" title="einklappen">▾</button></span></h2>
+  <div id="latbody">
   <div class="l"><span>ASR (speech in)</span><span id="m_asr">—</span></div>
   <div class="l"><span>LLM (think)</span><span id="m_llm">—</span></div>
   <div class="l"><span>voice retrieve</span><span id="m_sel">—</span></div>
@@ -131,6 +189,7 @@
     <input id="vol" type="range" min="0.5" max="6" step="0.5" value="2"
            style="width:120px;accent-color:var(--accent)">
   </div>
+  </div><!-- /latbody -->
 </div>
 
 <footer>
@@ -270,6 +329,87 @@ function addMsg(role, text){
 function fmt(ms){ return ms==null ? '—' : (ms>=1000 ? (ms/1000).toFixed(2)+' s' : Math.round(ms)+' ms'); }
 function setL(id,v){ $(id).textContent = v; }
 
+// ---- latency panel folds away; it used to cover the chat on short windows
+(function(){
+  const lat=$('lat'), btn=$('latfold');
+  const set=f=>{ lat.classList.toggle('folded',f); btn.textContent=f?'\u25b8':'\u25be';
+                 btn.title=f?'ausklappen':'einklappen';
+                 try{localStorage.setItem('latFolded',f?'1':'0')}catch(e){} };
+  set(localStorage.getItem('latFolded')==='1');
+  btn.onclick=e=>{ e.stopPropagation(); set(!lat.classList.contains('folded')); };
+})();
+
+// ---- adapter overlay: a weight for every adapter the server has
+const ADP = {};
+let ADP_GROUPS = null; const ADP_DEFAULTS = {};
+function adpSave(){ try{ localStorage.setItem('adpOv', JSON.stringify(ADP)); }catch(e){} }
+function adpCount(){
+  const n = Object.keys(ADP).filter(k => Math.abs((ADP[k]||0)-(ADP_DEFAULTS[k]||0))>1e-6).length;
+  $('adpn').textContent = n ? (n+' vom Standard abweichend') : 'alles auf Standard';
+  $('adpbtn').style.color = n ? 'var(--accent2)' : 'var(--accent)';
+}
+function adpRender(){
+  const q = ($('adpq').value||'').toLowerCase();
+  const box = $('adpbody'); box.innerHTML='';
+  for(const g of (ADP_GROUPS||[])){
+    const items = g.items.filter(it => !q || it.label.toLowerCase().includes(q)
+                                    || (it.hint||'').toLowerCase().includes(q));
+    if(!items.length) continue;
+    const d=document.createElement('div'); d.className='grp';
+    const h=document.createElement('h4'); h.textContent=g.title; d.appendChild(h);
+    const pp=document.createElement('p'); pp.textContent=g.note||''; d.appendChild(pp);
+    for(const it of items){
+      const v = (it.name in ADP) ? ADP[it.name] : (it.default||0);
+      const row=document.createElement('div');
+      row.className='row'+(Math.abs(v-(it.default||0))>1e-6?' act':'');
+      const nm=document.createElement('span'); nm.className='nm';
+      nm.textContent=it.label;
+      if(it.hint){ const i=document.createElement('i'); i.textContent=it.hint; nm.appendChild(i); }
+      const sl=document.createElement('input');
+      sl.type='range'; sl.min=0; sl.max=it.max||2; sl.step=0.05; sl.value=v;
+      sl.style.accentColor='var(--accent)';
+      const out=document.createElement('b'); out.textContent=(+v).toFixed(2);
+      sl.oninput=()=>{ const x=parseFloat(sl.value); ADP[it.name]=x;
+                       out.textContent=x.toFixed(2);
+                       row.classList.toggle('act',Math.abs(x-(it.default||0))>1e-6);
+                       adpCount(); adpSave(); };
+      row.appendChild(nm); row.appendChild(sl); row.appendChild(out); d.appendChild(row);
+    }
+    box.appendChild(d);
+  }
+  if(!box.children.length) box.textContent='nichts gefunden';
+}
+async function adpLoad(){
+  try{
+    const r = await fetch('/api/adapters'); const j = await r.json();
+    ADP_GROUPS = j.groups||[];
+    for(const g of ADP_GROUPS) for(const it of g.items){
+      ADP_DEFAULTS[it.name] = it.default||0;
+      if(!(it.name in ADP)) ADP[it.name] = it.default||0;
+    }
+    try{ const sv=JSON.parse(localStorage.getItem('adpOv')||'{}');
+         for(const k in sv) if(k in ADP_DEFAULTS) ADP[k]=sv[k]; }catch(e){}
+    adpRender(); adpCount();
+  }catch(e){ $('adpbody').textContent='Adapter nicht verfuegbar: '+e; }
+}
+function adpPayload(){
+  const q={}, ov={};
+  for(const k in ADP){
+    const v=ADP[k];
+    if(k.indexOf('sft3_quality:')===0) q[k]=v;
+    else if(v>0.001) ov[k]=v;
+  }
+  return {quality_lams:q, adapter_overrides:ov};
+}
+$('adpbtn').onclick=()=>{ $('adpwrap').classList.add('on'); if(!ADP_GROUPS) adpLoad(); };
+$('adpclose').onclick=()=>$('adpwrap').classList.remove('on');
+$('adpwrap').onclick=e=>{ if(e.target===$('adpwrap')) $('adpwrap').classList.remove('on'); };
+$('adpq').oninput=adpRender;
+$('adpreset').onclick=()=>{ for(const k in ADP_DEFAULTS) ADP[k]=ADP_DEFAULTS[k];
+                            adpSave(); adpRender(); adpCount(); };
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') $('adpwrap').classList.remove('on'); });
+adpLoad();
+
 /* ---------------- one turn ------------------------------------------------ */
 async function send(){
   const q = $('q'); const text = q.value.trim();
@@ -277,6 +417,8 @@ async function send(){
   busy = true; $('send').disabled = true; q.value=''; q.style.height='auto';
   addMsg('user', text);
   ensureAC(); resetAudio();
+
+
   ['m_llm','m_sel','m_gpu','m_srv','m_net','m_aud','m_wire','m_dur','m_gen','m_rtf','m_tot','m_sim','m_idv']
     .forEach(i=>setL(i,'—'));
   $('lstate').textContent='thinking'; $('bar').firstElementChild.style.width='0';
@@ -298,7 +440,8 @@ async function send(){
                             char_lora: $('charlora').checked,
                             speaker_lora_lam: parseFloat($('spk').value),
                             aesth_lora_lam: parseFloat($('aes').value),
-                            stop_bias: parseFloat($('stopb').value)})
+                            stop_bias: parseFloat($('stopb').value),
+                            ...adpPayload()})
     });
     if(!res.ok){ addMsg('bot','⚠ '+res.status+' '+await res.text()); throw new Error('http'); }
 

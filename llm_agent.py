@@ -90,11 +90,17 @@ its cues removed, so "script" must contain the complete line, exactly as you wan
    - "speed" swaps in a faster or slower take of the same reference. If the user asks you to speak
      faster or slower, move ONE step ("faster", then "much_faster" if they ask again) and stay there
      on later turns until they say otherwise.
-   - "style" stacks up to two voice-quality adapters on top of the reference, for the MANNER of
-     speaking: S_RANT high to rant, S_AUTH high for authority, S_WHIS high to whisper, VOLT high to
-     get loud, TEMP high to speed the delivery, S_DRAM high for drama, S_STRY high for storytelling.
-     Use it freely — it combines with the emotion and is what makes two takes of the same emotion
-     sound like different performances.
+   - "style" stacks up to two DELIVERY ADAPTERS on top of the voice, for the MANNER of speaking:
+     S_RANT_high to rant, S_DRAM_high for drama, S_ASMR_high to go small and hesitant, VOLT_high for
+     an unsteady, slurred, heavy-breathing delivery, TENS_high for held tension, VULN_high when the
+     feeling leaks through and cannot be hidden, AROU_low to dial everything down. Each carries a
+     "strength": 0.25 for a touch, 0.5 to make it clearly audible, 0.75 when it should dominate.
+     Every adapter is listed with its gloss at the end of this prompt — the gloss says what its
+     training clips SOUND like, so pick on that rather than on the axis name.
+     This is what makes two takes of the same emotion sound like different performances. Use it
+     when the manner matters, and leave the array empty when it does not — an adapter that fights
+     the emotion is worse than none, and these sixteen are a pilot set that has not been evaluated,
+     so keep the strengths modest unless the moment really calls for more.
    - The full bank is listed at the end of this prompt. USE ITS RANGE. Pick the condition that
      actually fits this moment, not the first plausible one — there are forty emotions and each
      comes in four shades, so "Disappointment moderate contained" and "Bitterness intense
@@ -251,17 +257,21 @@ def build_schema(catalog):
             "speed": {"type": "string",
                       "enum": ["much_slower", "slower", "normal",
                                "faster", "much_faster"]},
-            # extra voice-quality adapters stacked on top, for a manner of speaking
+            # delivery adapters stacked on top of the voice, for the MANNER of
+            # speaking.  Each is an extreme tail of one axis, trained against
+            # this checkpoint; the strength is its merge weight.
             "style": {
                 "type": "array",
-                "maxItems": 2,
+                "maxItems": config.SFT3_VN_MAX,
                 "items": {
                     "type": "object",
                     "properties": {
-                        "dimension": enum_or_str(catalog.get("voicenet_dimension")),
-                        "direction": {"type": "string", "enum": ["high", "low"]},
+                        "adapter": {"type": "string",
+                                    "enum": sorted(config.SFT3_VN_ADAPTERS)},
+                        "strength": {"type": "number",
+                                     "enum": list(config.SFT3_VN_LEVELS)},
                     },
-                    "required": ["dimension", "direction"],
+                    "required": ["adapter", "strength"],
                 },
             },
             "language": {"type": "string", "enum": ["English", "German"]},
@@ -291,9 +301,17 @@ def render_catalog(catalog, desc):
     L.append("  " + ", ".join(catalog.get("emotion", [])))
     vd = desc.get("voicenet_dimension", {})
     dims = catalog.get("voicenet_dimension", [])
-    L.append(f"\nVOICE QUALITIES ({len(dims)}) — a manner of speaking, not a feeling. "
-             "Pair with a level (extremely_low|moderately_low|moderately_high|very_high):")
+    L.append(f"\nREFERENCE VOICE QUALITIES ({len(dims)}) — only for choosing a reference "
+             "recording under voice.mode='voicenet'. Pair with a level "
+             "(extremely_low|moderately_low|moderately_high|very_high):")
     L.append("  " + "; ".join(f"{d} {vd[d]}" for d in dims if d in vd))
+    L.append(f"\nDELIVERY ADAPTERS ({len(config.SFT3_VN_ADAPTERS)}) — this is what \"style\" "
+             "picks. Each one is the extreme tail of one axis, and the gloss says what its "
+             "training clips actually sound like, not what the axis is called:")
+    for a in sorted(config.SFT3_VN_ADAPTERS):
+        L.append(f"  {a} — {config.SFT3_VN_ADAPTERS[a]}")
+    L.append("  strength: 0.25 a touch, 0.5 clearly there, 0.75 strong. "
+             "Leave \"style\" empty when the line needs no colouring beyond the emotion.")
     ch = desc.get("character", {})
     L.append(f"\nCHARACTERS ({len(catalog.get('character', []))}):")
     L.append("  " + "; ".join(f"{c} — {ch[c]}" if c in ch else c
@@ -460,9 +478,26 @@ class LLMAgent:
                            + "\n" + render_catalog(catalog, descriptions or {})
                            + _burst_block(bursts))
             if self.hosted_model:
-                self.system += ("\n\nReturn a single JSON object with exactly these "
-                                "keys: " + json.dumps(self.schema["properties"],
-                                                      ensure_ascii=False)[:1800])
+                # A truncated dump of the schema properties used to go here, and
+                # the enums of "voice" and "voice2" alone overran the 1800-char
+                # cut, so every key after them — including "style" — was invisible
+                # to the model and never emitted.  A compact skeleton instead:
+                # short enough to survive whole, explicit about every key.
+                self.system += (
+                    "\n\nReturn a single JSON object with exactly these keys, and no others:\n"
+                    '{"voice": {"mode": "emotion|voicenet|character|edge_case|sports|none",\n'
+                    '           "emotion": "<name from the bank>", "intensity": "intense|moderate",\n'
+                    '           "containment": "free|contained", "dimension": "<code>",\n'
+                    '           "level": "<level>", "character": "<name>", "edge_case": "<name>"},\n'
+                    ' "voice2": {same shape, "mode":"none" when the line stays in one state},\n'
+                    ' "speed": "much_slower|slower|normal|faster|much_faster",\n'
+                    ' "style": [{"adapter": "<one of the DELIVERY ADAPTERS listed below>",\n'
+                    '            "strength": 0.25|0.5|0.75}],   // 0-'
+                    + str(config.SFT3_VN_MAX) + ' entries, [] when none fits\n'
+                    ' "language": "English|German",\n'
+                    ' "delivery": "<the GENERAL voice description, prose>",\n'
+                    ' "script": "<the spoken line with its inline cues>"}\n'
+                    'Only keys from "voice"/"voice2" that the chosen mode needs must be filled.')
 
     async def health(self):
         # Only the local llama.cpp server exposes /health; the hosted endpoint

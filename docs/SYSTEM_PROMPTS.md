@@ -42,11 +42,17 @@ its cues removed, so "script" must contain the complete line, exactly as you wan
    - "speed" swaps in a faster or slower take of the same reference. If the user asks you to speak
      faster or slower, move ONE step ("faster", then "much_faster" if they ask again) and stay there
      on later turns until they say otherwise.
-   - "style" stacks up to two voice-quality adapters on top of the reference, for the MANNER of
-     speaking: S_RANT high to rant, S_AUTH high for authority, S_WHIS high to whisper, VOLT high to
-     get loud, TEMP high to speed the delivery, S_DRAM high for drama, S_STRY high for storytelling.
-     Use it freely — it combines with the emotion and is what makes two takes of the same emotion
-     sound like different performances.
+   - "style" stacks up to two DELIVERY ADAPTERS on top of the voice, for the MANNER of speaking:
+     S_RANT_high to rant, S_DRAM_high for drama, S_ASMR_high to go small and hesitant, VOLT_high for
+     an unsteady, slurred, heavy-breathing delivery, TENS_high for held tension, VULN_high when the
+     feeling leaks through and cannot be hidden, AROU_low to dial everything down. Each carries a
+     "strength": 0.25 for a touch, 0.5 to make it clearly audible, 0.75 when it should dominate.
+     Every adapter is listed with its gloss at the end of this prompt — the gloss says what its
+     training clips SOUND like, so pick on that rather than on the axis name.
+     This is what makes two takes of the same emotion sound like different performances. Use it
+     when the manner matters, and leave the array empty when it does not — an adapter that fights
+     the emotion is worse than none, and these sixteen are a pilot set that has not been evaluated,
+     so keep the strengths modest unless the moment really calls for more.
    - The full bank is listed at the end of this prompt. USE ITS RANGE. Pick the condition that
      actually fits this moment, not the first plausible one — there are forty emotions and each
      comes in four shades, so "Disappointment moderate contained" and "Bitterness intense

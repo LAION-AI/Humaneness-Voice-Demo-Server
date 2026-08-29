@@ -133,8 +133,19 @@ def _snap(repo, local=None):
 LORA_ROOTS = {
     "emotion":   _snap("TTS-AGI/moss-emotion-loras-v3"),
     "character": _snap("TTS-AGI/moss-character-loras-refined-public"),
-    "burst":     _snap("laion/vocal-burst-lora-adapters", "bursts"),
-    "voicenet":  _snap("laion/moss-voicenet-dimension-loras", "voicenet"),
+    # SFT3-native burst adapters (71), replacing the v2-era set.
+    # "burst":   _snap("laion/vocal-burst-lora-adapters", "bursts"),
+    "burst":     "/mnt/nvme/moss-15-v2-assets/loras/sft3_burst",
+    # The 57-dimension VoiceNet set is trained against the *untuned* v2 weights
+    # and is off-distribution on SFT3.  Parked, not deleted — restore this line
+    # and BASE_STYLE_LORAS below to bring it back.
+    # "voicenet":  _snap("laion/moss-voicenet-dimension-loras", "voicenet"),
+    # 16 tails of the axes that actually vary with delivery, trained against
+    # SFT3 itself.  Each is the top (or bottom) 1 % of a 3.1 M-utterance corpus
+    # along one axis.
+    "sft3_voicenet": "/mnt/nvme/moss-15-v2-assets/loras/sft3_voicenet",
+    # genuineness / vocal-burst blend / aesthetics, one per perceptual axis
+    "sft3_quality":  "/mnt/nvme/moss-15-v2-assets/loras/sft3_quality",
     "sports":    _snap("laion/moss-sports-commentator-lora"),
     # the anchor speaker as a trained adapter — the direct route to a consistent
     # voice, as opposed to converting after the fact
@@ -197,7 +208,10 @@ AESTH_LORA_LAM = float(os.environ.get("MOSS_AESTH_LORA_LAM", "0.0"))
 # delivery leans formal and read-aloud, and "looser" is what a chat should sound
 # like.  A persona that wants a different register just names other codes, which
 # stack on top rather than fighting these.
-BASE_STYLE_LORAS = (("voicenet:vn_S_CONV__high", 0.25),
+# Parked with the 57-dimension set: these names no longer resolve.  The base
+# register is carried by the prompt instead (see BASE_REGISTER).
+BASE_STYLE_LORAS = ()
+_OLD_BASE_STYLE_LORAS = (("voicenet:vn_S_CONV__high", 0.25),
                     ("voicenet:vn_S_CASU__high", 0.5),
                     ("voicenet:vn_WARM__high", 0.25))
 
@@ -394,3 +408,55 @@ TIMED_FRAMES_PER_WORD = float(os.environ.get("MOSS_TIMED_FPW", "4.5"))
 # The SFT3 timed script: durations, pauses and burst lengths that add up to the
 # Tokens budget, with the script repeated byte-identically into the Text field.
 TIMED_SCRIPT = os.environ.get("MOSS_TIMED_SCRIPT", "1") not in ("0", "false", "")
+
+# ---------------------------------------------------------------- delivery tails
+# The 16 SFT3 VoiceNet adapters, with the gloss from the model card: not a
+# definition of the axis, but what the clips it was trained on are described as.
+# Shown to the director so it can pick on sound rather than on a code it half
+# remembers.
+SFT3_VN_ADAPTERS = {
+    "AROU_high":   "highly aroused, very dominant, tense, elated, thin",
+    "AROU_low":    "dialled down, not performed at full size; narrow pitch range, submissive, slow",
+    "ARSH_high":   "energised, slightly dominant, brisk, wide pitch range",
+    "ARSH_low":    "involuntary rather than performed; weeping, tearful, searing",
+    "EMPH_high":   "tense, highly aroused, very dominant, guarded, elated",
+    "EXPL_high":   "mildly negative, normal-paced, conversational, quiet background",
+    "S_ASMR_high": "dialled down, pouring out, uncertain, hedging, full of doubt",
+    "S_DRAM_high": "dramatic; highly aroused, very dominant, very wide pitch range",
+    "S_RANT_high": "ranting, very rough, guarded, very dominant, highly aroused",
+    "TENS_high":   "tense, guarded, volatile, highly aroused, very dark",
+    "VALN_low":    "involuntary rather than performed; blood-curdling, horrified, at the edge of a scream",
+    "VALN_high":   "elated, positive, wide pitch range — the top of the valence axis",
+    "VALS_high":   "positive affect, light breath, wide pitch range",
+    "VALS_low":    "involuntary rather than performed; blood-curdling, weeping, tearful",
+    "VFLX_high":   "slightly bright, fairly smooth, energised, positive, wide pitch range",
+    "VOLT_high":   "volatile, heavy breath, slurred, cool timbre, dark",
+    "VULN_high":   "dialled down, involuntary rather than performed, in every breath, impossible to hide",
+}
+# The director picks one of these merge weights.  The sweep that produced 1.5 for
+# the emotion adapters has NOT been repeated on this set, and the set has not
+# been evaluated at all, so the demo stays well under the trained value of 1.0.
+SFT3_VN_LEVELS = (0.25, 0.5, 0.75)
+SFT3_VN_MAX = int(os.environ.get("MOSS_SFT3_VN_MAX", "2"))
+
+# ---------------------------------------------------------------- quality axes
+# Three adapters, each the top 1 % of a 3.14 M-utterance corpus along one
+# perceptual axis.  On by default at the trained value; the sliders in the UI
+# override them per turn.  Unevaluated, like the rest of this family — 1.0 is
+# where they were trained, not where they were shown to be best.
+QUALITY_LORAS = {
+    "sft3_quality:genuineness_high": float(os.environ.get("MOSS_LAM_GENUINE", "1.0")),
+    "sft3_quality:blend_high":       float(os.environ.get("MOSS_LAM_BLEND", "1.0")),
+    "sft3_quality:esthetics_high":   float(os.environ.get("MOSS_LAM_ESTH", "1.0")),
+}
+QUALITY_LABELS = {
+    "sft3_quality:genuineness_high": "Genuineness",
+    "sft3_quality:blend_high":       "Burst blend",
+    "sft3_quality:esthetics_high":   "Aesthetics",
+}
+# Burst adapters are a colour on top of a sound the model already makes, so they
+# are dosed low: a burst that is merely present gets 0.25, one the director
+# marked as intense gets 0.5.  Higher starts to drag the whole line towards the
+# burst.
+BURST_LAM = float(os.environ.get("MOSS_BURST_LAM", "0.25"))
+BURST_LAM_INTENSE = float(os.environ.get("MOSS_BURST_LAM_INTENSE", "0.5"))

@@ -32,8 +32,11 @@ import config
 # manual-derived doses
 LAM_EMOTION = 0.5
 LAM_EMOTION_UNDER_BURST = 0.5     # capped again against the burst dose at apply time
-LAM_BURST_INLINE = 0.5
-LAM_BURST_SOLO = 0.75
+# A burst adapter colours a sound the model already produces on its own, so it
+# is dosed lightly: too much and the whole line drifts towards the burst.  A
+# burst standing alone as its own beat gets the higher dose.
+LAM_BURST_INLINE = config.BURST_LAM
+LAM_BURST_SOLO = config.BURST_LAM_INTENSE
 LAM_CHARACTER = 0.75
 LAM_EXPLICIT = 1.0
 LAM_SPORTS = 0.75

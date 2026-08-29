@@ -252,6 +252,48 @@ async def state():
     }
 
 
+@app.get("/api/adapters")
+def adapters():
+    """Every adapter the overlay can dial, grouped, with its default weight.
+
+    A default of 0 does not mean "off": it means nothing is forced and the
+    director decides.  Only the three quality axes are on by default.
+    """
+    lb = STATE.get("lora")
+    if lb is None:
+        return JSONResponse({"error": "adapters disabled"}, status_code=503)
+    def group(kind):
+        return sorted(n.split(":", 1)[1] for n in lb.repos if n.startswith(kind + ":"))
+    out = []
+    out.append({"kind": "sft3_quality", "title": "Quality axes",
+                "note": "On by default at the trained value of 1.0.",
+                "items": [{"name": n, "label": config.QUALITY_LABELS.get(n, n),
+                           "default": config.QUALITY_LORAS.get(n, 0.0), "max": 2.0}
+                          for n in sorted(config.QUALITY_LORAS)
+                          if n in lb.repos]})
+    out.append({"kind": "sft3_voicenet", "title": "Delivery axes",
+                "note": "The director picks up to two of these itself. A slider "
+                        "forces one on regardless.",
+                "items": [{"name": f"sft3_voicenet:{n}", "label": n,
+                           "hint": config.SFT3_VN_ADAPTERS.get(n, ""),
+                           "default": 0.0, "max": 2.0} for n in group("sft3_voicenet")]})
+    out.append({"kind": "sft3_emotion", "title": "Emotions",
+                "note": "The retrieval picks one per turn at 1.5. A slider adds "
+                        "or replaces it.",
+                "items": [{"name": f"sft3_emotion:{n}", "label": n.replace("_", " "),
+                           "default": 0.0, "max": 2.0} for n in group("sft3_emotion")]})
+    out.append({"kind": "burst", "title": "Vocal bursts",
+                "note": f"Added automatically when the script contains one, at "
+                        f"{config.BURST_LAM} ({config.BURST_LAM_INTENSE} standing alone).",
+                "items": [{"name": f"burst:{n}", "label": n.replace("_", " "),
+                           "default": 0.0, "max": 1.5} for n in group("burst")]})
+    return {"groups": out,
+            "always": [{"name": config.SFT3_DPO_LORA, "label": "Quality (DPO p2)",
+                        "default": config.SFT3_DPO_LAM},
+                       {"name": "sft3_voice:<profile>", "label": "Voice identity",
+                        "default": config.PROFILE_LORA_LAM}]}
+
+
 @app.get("/api/voices")
 def voices():
     if not STATE["bank"]:
@@ -477,6 +519,39 @@ async def turn(req: Request):
         want_char = body.get("char_lora", True) is not False
         specs = []
         lb = STATE.get("lora")
+        # perceptual-quality adapters: on by default, each with its own slider
+        q_spec = []
+        if lb:
+            ql = body.get("quality_lams") or {}
+            for nm, dflt in config.QUALITY_LORAS.items():
+                lam = ql.get(nm, ql.get(nm.split(":")[-1], dflt))
+                try:
+                    lam = float(lam)
+                except (TypeError, ValueError):
+                    lam = dflt
+                if lam > 0.001 and nm in lb.repos:
+                    q_spec.append((nm, lam))
+        vn_spec = []
+        if lb and body.get("delivery_loras", True) is not False:
+            seen_vn = set()
+            for it in (out.get("style") or []):
+                if not isinstance(it, dict):
+                    continue
+                a = it.get("adapter")
+                if a not in config.SFT3_VN_ADAPTERS or a in seen_vn:
+                    continue
+                try:
+                    lam = float(it.get("strength") or 0)
+                except (TypeError, ValueError):
+                    continue
+                # the set is a pilot and unevaluated; keep it inside the dial
+                lam = max(0.0, min(lam, max(config.SFT3_VN_LEVELS)))
+                nm = f"sft3_voicenet:{a}"
+                if lam > 0.001 and nm in lb.repos:
+                    seen_vn.add(a)
+                    vn_spec.append((nm, lam))
+                if len(vn_spec) >= config.SFT3_VN_MAX:
+                    break
         dpo_spec = []
         if lb and body.get("dpo_lora", True) is not False \
                 and config.SFT3_DPO_LORA in lb.repos and config.SFT3_DPO_LAM > 0.001:
@@ -495,7 +570,7 @@ async def turn(req: Request):
                 lam = config.PURE_PROFILE_LAM if lam is None else float(lam)
                 if prof and prof["lora"] in lb.repos and lam > 0.001:
                     specs = [(prof["lora"], lam)]
-            specs = dpo_spec + specs + emo_spec
+            specs = dpo_spec + q_spec + specs + vn_spec + emo_spec
         elif lb:
             try:
                 mix = out.get("blend")
@@ -514,7 +589,7 @@ async def turn(req: Request):
                         have_character=set(lb.names("character")),
                         have_burst=lb.names("burst"),
                         have_voicenet=set(lb.names("voicenet")),
-                        style=out.get("style"))
+                        style=None)
             except Exception as e:
                 print("[app] lora plan failed:", e, flush=True)
             # The speaker adapter goes on top of everything else: it is what makes
@@ -562,10 +637,33 @@ async def turn(req: Request):
             specs = head + [s for s in specs if s[0] not in picked]
             if dpo_spec:
                 specs = dpo_spec + [x for x in specs if x[0] != config.SFT3_DPO_LORA]
+            if q_spec:
+                picked_q = {n for n, _ in q_spec}
+                specs = [x for x in specs if x[0] not in picked_q] + q_spec
+            if vn_spec:
+                picked_vn = {n for n, _ in vn_spec}
+                specs = [x for x in specs if x[0] not in picked_vn] + vn_spec
             if emo_spec:
                 # the v3 emotion adapters were trained against the untuned v2
                 # weights; on sft3 the matching set is the one trained with it
                 specs = [s for s in specs if not s[0].startswith("emotion:")] + emo_spec
+
+        # The overlay's sliders: a full adapter name mapped to a weight.  0 means
+        # "leave it to the director", which is not the same as forcing it off —
+        # the director's own picks stay unless a slider names them.
+        ov = body.get("adapter_overrides") or {}
+        if lb and isinstance(ov, dict) and ov:
+            forced = []
+            for nm, lam in ov.items():
+                try:
+                    lam = float(lam)
+                except (TypeError, ValueError):
+                    continue
+                if lam > 0.001 and nm in lb.repos:
+                    forced.append((nm, lam))
+            if forced:
+                names = {n for n, _ in forced}
+                specs = [x for x in specs if x[0] not in names] + forced
 
         yield _ev({"type": "llm", "reply": out["reply"], "general": out["general"],
                    "script": out["script"], "voice": out.get("voice"),

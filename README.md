@@ -33,8 +33,10 @@ Everything below is downloaded from the Hugging Face Hub. Nothing is trained her
 | Quality adapter, rank 64 | [`laion/moss-va-sft3-dpo-lora-p2`](https://huggingface.co/laion/moss-va-sft3-dpo-lora-p2) — supersedes [`…-dpo-lora`](https://huggingface.co/laion/moss-va-sft3-dpo-lora) |
 | Voice-identity adapters, 500 × rank 16 | [`laion/moss-va-sft3-voice-loras`](https://huggingface.co/laion/moss-va-sft3-voice-loras) |
 | Emotion adapters, 40 × rank 16 | [`laion/moss-va-sft3-emotion-loras`](https://huggingface.co/laion/moss-va-sft3-emotion-loras) |
-| Voice-quality adapters (57 dimensions) | [`laion/moss-voicenet-dimension-loras`](https://huggingface.co/laion/moss-voicenet-dimension-loras) |
-| Vocal-burst adapters (64) | [`laion/vocal-burst-lora-adapters`](https://huggingface.co/laion/vocal-burst-lora-adapters) |
+| Perceptual-quality adapters, 3 × rank 16 | local SFT3-native set (genuineness, vocal-burst blend, aesthetics) |
+| Delivery-axis adapters, 17 × rank 16 | local SFT3-native set — replaces the 57-dimension VoiceNet adapters below |
+| Vocal-burst adapters, 71 × rank 16 | local SFT3-native set — replaces the v2-era [`laion/vocal-burst-lora-adapters`](https://huggingface.co/laion/vocal-burst-lora-adapters) |
+| Voice-quality adapters (57 dimensions) — **parked**, trained against v2 | [`laion/moss-voicenet-dimension-loras`](https://huggingface.co/laion/moss-voicenet-dimension-loras) |
 | Character adapters | [`TTS-AGI/moss-character-loras-refined-public`](https://huggingface.co/TTS-AGI/moss-character-loras-refined-public) |
 | Base checkpoint the older adapters were trained on | [`laion/moss-tts-local-transformer-4.55b-voice-acting-v2`](https://huggingface.co/laion/moss-tts-local-transformer-4.55b-voice-acting-v2) |
 
@@ -168,12 +170,16 @@ the rate of the format's own worked example.
 
 ## Which adapters get merged, and when
 
+> The full protocol — the merge arithmetic, the tied-weight exception, every set,
+> every slider, and how to reproduce the whole stack — is in
+> [`docs/ADAPTERS.md`](docs/ADAPTERS.md). This section is the summary.
+
 Adapters are **merged as weighted deltas** into the model weights for the
 duration of one turn, then unmerged. This matters: PEFT's `add_weighted_adapter`
 refuses this combination, because the quality adapter is rank 64 while the voice
 and emotion adapters are rank 16. Merging deltas has no such constraint. Each
-adapter's own `alpha/r` is applied first (2.0 for all the rank-16 sets), and the
-weight below is on top of that.
+adapter's own `alpha/r` is applied first (2.0 for every set here), and the weight
+below is on top of that.
 
 ### Default stack — one turn, nothing ticked or unticked
 
@@ -181,11 +187,19 @@ weight below is on top of that.
 |---|---|---|---|
 | 1 | `sft3_dpo:p2` | **1.0** | general quality, the published weight |
 | 2 | `sft3_voice:<profile>` | **1.0** | speaker identity. 1.0 is the trained value and has not been swept |
-| 3 | `voicenet:vn_S_CONV__high` | 0.25 | base style: conversational |
-| 4 | `voicenet:vn_S_CASU__high` | 0.5 | base style: casual |
-| 5 | `voicenet:vn_WARM__high` | 0.25 | base style: warm |
-| 6 | `burst:<label>` | 0.5 | only when the script contains a burst that has an adapter |
-| 7 | `sft3_emotion:<Emotion>` | **1.5** | the emotion retrieval picked |
+| 3 | `burst:<label>` | 0.25 | only when the script contains a burst that has an adapter. 0.5 when the burst stands alone (a line under 14 words) |
+| 4 | `sft3_quality:genuineness_high` | **1.0** | perceptual quality, on by default at the trained value |
+| 5 | `sft3_quality:blend_high` | **1.0** | vocal-burst blend, likewise |
+| 6 | `sft3_quality:esthetics_high` | **1.0** | aesthetics, likewise |
+| 7–8 | `sft3_voicenet:<axis>` | 0.25 / 0.5 / 0.75 | up to two delivery axes, only when the director asks for them |
+| 9 | `sft3_emotion:<Emotion>` | **1.5** | the emotion retrieval picked |
+
+Rows 1, 2, 4, 5 and 6 are on every turn; the rest are conditional. Ordering has
+no effect on the arithmetic — the deltas are summed into one weight per module.
+
+The three base-style VoiceNet adapters that used to sit in this list are gone: the
+57-dimension set they came from was trained against the untuned v2 checkpoint and
+is parked. The conversational register is carried by the prompt instead.
 
 The quality adapter is `p2`, the best checkpoint measured in this line: reward
 0.4757 against 0.4708 for its predecessor, the highest emotion percentile of any
@@ -219,19 +233,30 @@ it, median word error rate still 0.000 and mean at its lowest. It breaks between
 |---|---|---|
 | **Emotion nuances** | on | off ⇒ no emotion adapter. The turn runs on the base checkpoint, the quality and voice adapters, and the retrieved reference clip |
 | **Character LoRA** | on | off ⇒ no voice-identity adapter; identity then comes only from the reference recordings |
-| **Pure** | off | on ⇒ base model + retrieved reference clips + optionally the voice adapter at 0.5, and **nothing else** — no base style, no burst, no emotion, no quality adapter |
-| **Aesthetics** (`vn_ESTH__high`) | **0.0, off** | trained against the untuned v2 weights, so off-distribution on SFT3. The slider turns it back on |
+| **Pure** | off | on ⇒ drops everything the v2-era planner would have added (v2 emotion, character, burst) and halves the voice adapter to 0.5. The DPO adapter, the quality trio, the delivery axes and the emotion adapter still apply |
+| **Quality axes** (three sliders) | **1.0 each, on** | genuineness, vocal-burst blend, aesthetics. These are the only sliders where 0 really means off |
+| **Delivery axes** (17 sliders) | 0 | 0 means *leave it to the director*, not "force off". A slider above 0 forces that axis on at that weight |
+| **Aesthetics** (`vn_ESTH__high`) | **0.0, off** | trained against the untuned v2 weights. The set it belongs to is parked, so this dial currently resolves to nothing |
 | **Speaker LoRA** (velvet-sage) | off when a profile is active | superseded by the per-profile voice adapter |
 | **Sentence-end brake** | 3.0 | additive pressure in nats against the stop token, so a line is not cut off early |
 
+The adapter overlay is populated from `GET /api/adapters` and its sliders are
+posted back as `quality_lams` and `adapter_overrides`. Full semantics in
+[`docs/ADAPTERS.md`](docs/ADAPTERS.md).
+
 ### An honest note on provenance
 
-Only three of the adapter sets — `sft3_dpo`, `sft3_voice`, `sft3_emotion` — were
-trained against the SFT3 weights. The VoiceNet base-style adapters and the burst
-adapters were trained against the untuned v2 checkpoint and are therefore
-off-distribution here. They audibly do something, but what they do on SFT3 is not
-measured. They are kept at low weights (0.25–0.5) for that reason, and the
-strongest such adapter, aesthetics at 1.1, was switched off entirely.
+Six of the adapter sets — `sft3_dpo`, `sft3_voice`, `sft3_emotion`,
+`sft3_quality`, `sft3_voicenet` and the 71 SFT3 burst adapters — were trained
+against the SFT3 weights and are in distribution. The character, profile, speaker
+and legacy emotion sets were trained against the untuned v2 checkpoint; the
+57-dimension VoiceNet set was too, and has been parked rather than deleted.
+
+In distribution is not the same as evaluated. Only `sft3_dpo`, `sft3_voice` and
+`sft3_emotion` have published measurements. The quality trio, the delivery axes
+and the burst set are **unevaluated** — 1.0 and 0.25/0.5/0.75 are the values they
+were trained at, or a deliberately conservative fraction of them, not weights
+shown to be best.
 
 ---
 
@@ -420,7 +445,7 @@ occupy 8.8 MB.
 | `index.html`, `studio.html`, `report.html` | the three pages |
 | `setup/` | corpus extraction, retrieval index, profile traits |
 | `eval/` | consistency and completeness checks |
-| `docs/` | generated defaults, verbatim system prompts, measurement log |
+| `docs/` | [`ADAPTERS.md`](docs/ADAPTERS.md) (the adapter protocol), generated defaults, verbatim system prompts, measurement log |
 
 ---
 
@@ -431,7 +456,9 @@ occupy 8.8 MB.
   the obvious next step and is not implemented.
 * Voice-quality dimensions cannot be retrieved from prose with this embedding
   model at all.
-* Four of the adapter sets are off-distribution on SFT3 (see above).
+* The character, profile, speaker and legacy emotion sets are off-distribution on
+  SFT3, and the quality, delivery-axis and burst sets are in distribution but
+  unevaluated (see above, and [`docs/ADAPTERS.md`](docs/ADAPTERS.md)).
 * The corpus's own release notes record two defects in the generation run behind
   these recordings: 99.96 % of burst tags are Title-Case, which the speech model
   spells out letter by letter, and burst density came out at 33.7 % of lines
