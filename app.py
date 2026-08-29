@@ -313,7 +313,10 @@ async def say(req: Request):
         return JSONResponse({"error": "not ready"}, status_code=503)
     ref = []
     if b.get("anchor", True) and bank:
-        a = bank.anchor()
+        # a specific speaker's own recording, so a harness can condition on the
+        # same voice whose adapter it is testing; the default is the corpus
+        # anchor, which is a different speaker entirely
+        a = bank.anchor(b["anchor_path"]) if b.get("anchor_path") else bank.anchor()
         if a is not None:
             ref.append(a)
     if b.get("reference") and bank:
@@ -340,6 +343,44 @@ async def say(req: Request):
     w = np.concatenate(chunks) if chunks else np.zeros(1, np.float32)
     pcm = np.clip(w * 32767, -32768, 32767).astype("<i2").tobytes()
     return {"sr": tts.sr, "pcm": base64.b64encode(pcm).decode(), **meta}
+
+
+@app.post("/api/say_batch")
+async def say_batch(req: Request):
+    """Several exact texts in one forward pass, one adapter set for all of them.
+
+    The sweep harness lives on this: a condition is ten utterances, and running
+    them together instead of one after another is where the time goes.
+    """
+    import base64
+    b = await req.json()
+    tts, bank = STATE["tts"], STATE["bank"]
+    if not tts:
+        return JSONResponse({"error": "not ready"}, status_code=503)
+    ref = []
+    if b.get("anchor", True) and bank:
+        a = bank.anchor(b["anchor_path"]) if b.get("anchor_path") else bank.anchor()
+        if a is not None:
+            ref.append(a)
+    items = []
+    for it in b.get("items") or []:
+        items.append({"text": it["text"], "instruction": it.get("instruction", ""),
+                      "language": it.get("language", "English"),
+                      "tokens": int(it["tokens"]), "ref_codes": ref or None})
+    if not items:
+        return JSONResponse({"error": "no items"}, status_code=400)
+    t0 = time.time()
+    waves = await asyncio.get_running_loop().run_in_executor(
+        None, lambda: tts.generate_batch(
+            items, lora_specs=b.get("loras"), seed=b.get("seed"),
+            audio_temperature=b.get("audio_temperature"),
+            stop_bias=b.get("stop_bias")))
+    out = []
+    for w in waves:
+        pcm = np.clip(np.asarray(w) * 32767, -32768, 32767).astype("<i2").tobytes()
+        out.append(base64.b64encode(pcm).decode())
+    return {"sr": tts.sr, "pcm": out, "n": len(out),
+            "gpu_ms": round((time.time() - t0) * 1000, 1)}
 
 
 @app.post("/api/asr")

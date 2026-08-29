@@ -135,7 +135,12 @@ class TTSEngine:
             # the end token until the duration we asked for is plausibly used.
             # Healthy takes reach 85-100% of the budget, truncated ones ~35%, so a
             # floor well below the normal range only catches the failures.
-            if min_frames and len(frames) < min_frames:
+            if min_frames is not None and not isinstance(min_frames, int):
+                # one floor per row: a batch holds lines of different lengths
+                below = min_frames > len(frames)
+                cont = cont | below
+                finished = finished & ~below
+            elif min_frames and len(frames) < min_frames:
                 cont = torch.ones_like(cont)
                 finished = torch.zeros_like(finished)
             if not bool(cont.any().item()):
@@ -413,6 +418,71 @@ class TTSEngine:
                       "tokens": n_tok_total, "parts": len(parts), "loras": applied,
                       "tail_codes": tail,
                       "rtf": round((gpu_ms / 1000) / dur, 3) if dur > 0 else None}
+
+    @torch.inference_mode()
+    def generate_batch(self, items, lora_specs=None, **over):
+        """Generate several takes in one forward pass — no streaming.
+
+        The streaming path is batch 1 by necessity: audio has to start playing
+        before the line is finished.  A sweep does not need that, and running
+        ten utterances together turns ten launch-bound decodes into one.  The
+        generation loop was already written with a batch dimension, so this only
+        has to build a padded batch and cut the results apart again.
+
+        `items`: dicts with text, instruction, language, tokens, ref_codes.
+        Returns a list of float32 arrays at self.sr.
+        """
+        p = dict(config.DEFAULTS)
+        p.update({k: v for k, v in over.items() if v is not None})
+        with self.lock:
+            applied = []
+            if self.lora is not None:
+                try:
+                    applied = self.lora.apply(lora_specs)
+                except Exception as e:
+                    print(f"[tts] lora apply failed: {e}", flush=True)
+                    self.lora.clear()
+            try:
+                msgs = []
+                for it in items:
+                    kw = dict(text=it["text"], instruction=it.get("instruction", ""),
+                              language=it.get("language", "English"),
+                              tokens=int(it["tokens"]))
+                    refs = it.get("ref_codes")
+                    if refs:
+                        kw["reference"] = [r.to(torch.long) for r in refs if r is not None]
+                    msgs.append([self.proc.build_user_message(**kw)])
+                torch.manual_seed(int(p["seed"] or 0))
+                batch = self.proc(msgs, mode="generation")   # left-padded
+                iid = batch["input_ids"].to(self.device)
+                am = batch["attention_mask"].to(self.device)
+                toks = [int(it["tokens"]) for it in items]
+                p["max_new_tokens"] = int(max(toks) * config.TOKEN_HEADROOM) + 64
+                minf = torch.tensor(
+                    [int(t * config.MIN_FRAME_FRACTION) for t in toks],
+                    device=self.device)
+                frames = None
+                for fr in self._stream_frames(iid, am, p, chunk_frames=10 ** 9,
+                                              min_frames=minf):
+                    frames = fr
+                if not frames:
+                    return [np.zeros(0, np.float32) for _ in items]
+                allf = torch.stack(frames, dim=1)      # (B, T, n_vq)
+                pad = int(self.model.config.audio_pad_token_id)
+                out = []
+                for bi in range(allf.shape[0]):
+                    c = allf[bi]
+                    live = (c != pad).any(dim=-1)
+                    n = int(live.nonzero()[-1].item()) + 1 if bool(live.any()) else 0
+                    if n <= 0:
+                        out.append(np.zeros(0, np.float32))
+                        continue
+                    w = self.proc.decode_audio_codes([c[:n]], return_stereo=False)[0]
+                    out.append(w.reshape(-1).float().cpu().numpy())
+                return out
+            finally:
+                if self.lora is not None:
+                    self.lora.unapply()
 
     def warmup(self):
         try:

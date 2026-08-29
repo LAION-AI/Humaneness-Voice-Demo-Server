@@ -449,6 +449,18 @@ occupy 8.8 MB.
 
 ---
 
+## Measured adapter costs
+
+Every adapter in this stack was swept across six merge weights on ten fixed
+utterances, and scored for intelligibility, naturalness, vocal-burst blend and
+speaker similarity. The headline: **SFT3 + DPO-p2 alone is clean — word error
+0.013 and not one invented word in ten takes** — and every further adapter
+degrades that, monotonically in both count and weight.
+
+See [`docs/EXPERIMENTS.md`](docs/EXPERIMENTS.md) for the method, all prompts, all
+hyper-parameters and the full tables, and `eval/results/` for the raw per-take
+data including every transcript.
+
 ## Known limits
 
 * Emotion retrieval is right about 61 % of the time over 40 classes. A wrong pick
