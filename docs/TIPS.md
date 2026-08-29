@@ -112,7 +112,7 @@ From the same 5,740-cell sweep:
 
 Two things this table does not say on its own. **Emotion adapters saturate at
 1.0** — pooled they climb to +0.035 at w = 1.0 (t 4.82) and then stop
-(1.5 − 1.0 = −0.007, t −0.90). This server already runs them at 1.0, which is
+(1.5 − 1.0 = −0.0026, t −0.40). This server already runs them at 1.0, which is
 right; going to 1.5 is not harmful, just past the point of return. And **"below
 resolution" is not "no effect"**: the 24 quiet emotion adapters still move when
 pooled (+0.024 at w = 1.0, t 2.70). Ten takes per cell is not enough to prove one
