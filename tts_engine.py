@@ -604,6 +604,7 @@ class TTSEngine:
         parts = self.split_script(script)
         t0 = time.time()
         tail = None
+        prompt_unc = None
         started = False
         total_samples = 0
         n_tok_total = 0
@@ -663,6 +664,8 @@ class TTSEngine:
                 elif kind == "end":
                     n_tok_total += payload.get("tokens") or 0
                     applied = payload.get("loras", applied)
+                    if payload.get("prompt_unc"):
+                        prompt_unc = payload["prompt_unc"]
                     levers_payload = payload.get("levers", levers_payload)
                     # keep the last part's tail; it is what continues the voice
                     tail = payload.get("tail_codes", tail)
@@ -671,6 +674,10 @@ class TTSEngine:
         yield "end", {"gpu_total_ms": round(gpu_ms, 1), "audio_sec": round(dur, 3),
                       "tokens": n_tok_total, "parts": len(parts), "loras": applied,
                       "tail_codes": tail, "levers": levers_payload,
+                      # the neutralised branch, when guidance ran.  stream_pcm puts it
+                      # in its own end payload; without forwarding it here the turn
+                      # path never sees it and the documented field is unreachable.
+                      "prompt_unc": prompt_unc,
                       "rtf": round((gpu_ms / 1000) / dur, 3) if dur > 0 else None}
 
     @torch.inference_mode()
