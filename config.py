@@ -184,7 +184,13 @@ SFT3_DPO_LAM = float(os.environ.get("MOSS_SFT3_DPO_LAM", "1.0"))
 # 0.408 -> 0.471, genuineness and burst blend both rise with it, median word
 # error rate still 0.000 and mean at its lowest.  Intelligibility only breaks
 # between 1.5 and 2.0, and as a tail of derailed clips rather than general decay.
-SFT3_EMOTION_LAM = float(os.environ.get("MOSS_SFT3_EMOTION_LAM", "1.5"))
+# 1.5 is the weight the adapter card recommends, and it is the single most
+# expensive item in this stack: averaged over all forty adapters it costs far
+# more word error than 1.0, and individual adapters at 1.5 do not degrade gently
+# but derail outright (Confusion @1.5 reached word error 1.285 with 19 invented
+# words).  1.0 keeps most of the effect — genuineness 1.90 against 1.83 — at
+# word error 0.018 instead of 0.083.
+SFT3_EMOTION_LAM = float(os.environ.get("MOSS_SFT3_EMOTION_LAM", "1.0"))
 USE_LORA = os.environ.get("MOSS_USE_LORA", "1") not in ("0", "false", "")
 # emotion adapters are the ones the agent reaches for most, so they sit in RAM
 PRELOAD_LORA_KINDS = tuple(
@@ -359,7 +365,11 @@ PROFILE_REFS = os.environ.get("MOSS_PROFILE_REFS",
 DEFAULT_PROFILE = os.environ.get("MOSS_DEFAULT_PROFILE", "emolia_c1699")
 # The profile adapter is the speaker; at 0.25 the identity barely came through.
 # It also replaces the standalone velvet-sage dial rather than stacking with it.
-PROFILE_LORA_LAM = float(os.environ.get("MOSS_PROFILE_LORA_LAM", "1.0"))
+# The reference recording in the prompt already carries the identity: speaker
+# similarity without any voice adapter is 0.513.  The adapter adds 0.068 at 0.25
+# and only 0.019 more by 1.0, while word error goes the wrong way.  Most of the
+# identity, none of the cost.
+PROFILE_LORA_LAM = float(os.environ.get("MOSS_PROFILE_LORA_LAM", "0.25"))
 
 # Host-RAM cache bound for adapters.  65 GB exist on disk; without a cap a long
 # session loads its way through them until the kernel intervenes.
@@ -437,17 +447,24 @@ SFT3_VN_ADAPTERS = {
 # the emotion adapters has NOT been repeated on this set, and the set has not
 # been evaluated at all, so the demo stays well under the trained value of 1.0.
 SFT3_VN_LEVELS = (0.25, 0.5, 0.75)
-SFT3_VN_MAX = int(os.environ.get("MOSS_SFT3_VN_MAX", "2"))
+# One delivery axis costs little; two took word error from 0.041 to 0.143 and put
+# invented words in half the takes.  The director gets one.
+SFT3_VN_MAX = int(os.environ.get("MOSS_SFT3_VN_MAX", "1"))
 
 # ---------------------------------------------------------------- quality axes
 # Three adapters, each the top 1 % of a 3.14 M-utterance corpus along one
 # perceptual axis.  On by default at the trained value; the sliders in the UI
 # override them per turn.  Unevaluated, like the rest of this family — 1.0 is
 # where they were trained, not where they were shown to be best.
+# Doses measured, not assumed.  All three at 1.0 scored word error 0.116 with an
+# invented word in 60% of takes; at 0.25 / 0.5 / 0.5 the same three score 0.055.
+# Genuineness is the one that has to stay low — it raises its own score only
+# below 0.5 and collapses intelligibility above 1.0 (0.176 at 1.25).  Blend is
+# safe at any weight measured.  See docs/EXPERIMENTS.md.
 QUALITY_LORAS = {
-    "sft3_quality:genuineness_high": float(os.environ.get("MOSS_LAM_GENUINE", "1.0")),
-    "sft3_quality:blend_high":       float(os.environ.get("MOSS_LAM_BLEND", "1.0")),
-    "sft3_quality:esthetics_high":   float(os.environ.get("MOSS_LAM_ESTH", "1.0")),
+    "sft3_quality:genuineness_high": float(os.environ.get("MOSS_LAM_GENUINE", "0.25")),
+    "sft3_quality:blend_high":       float(os.environ.get("MOSS_LAM_BLEND", "0.5")),
+    "sft3_quality:esthetics_high":   float(os.environ.get("MOSS_LAM_ESTH", "0.5")),
 }
 QUALITY_LABELS = {
     "sft3_quality:genuineness_high": "Genuineness",

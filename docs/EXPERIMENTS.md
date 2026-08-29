@@ -306,6 +306,34 @@ emotion 1.0 give word error 0.018 with genuineness still at 1.90.
 to 0.143 and put invented words in half the takes.
 
 
+## What was adopted
+
+The demo now ships the doses these measurements point at, not the trained
+defaults it started from:
+
+| adapter | was | now | why |
+|---|--:|--:|---|
+| `sft3_quality:genuineness_high` | 1.0 | **0.25** | raises its own score only below 0.5; word error 0.176 at 1.25 |
+| `sft3_quality:blend_high` | 1.0 | **0.5** | safe at every weight measured; 0.25 gave the best genuineness of the whole study |
+| `sft3_quality:esthetics_high` | 1.0 | **0.5** | cheap on intelligibility but costs genuineness monotonically |
+| `sft3_voice:<profile>` | 1.0 | **0.25** | speaker similarity 0.581 at 0.25 vs 0.600 at 1.0, against 0.513 with no adapter at all |
+| `sft3_emotion:<name>` | 1.5 | **1.0** | 1.5 derails whole takes rather than degrading gently |
+| delivery axes, max | 2 | **1** | two took word error from 0.041 to 0.143 |
+| `sft3_dpo:p2` | 1.0 | 1.0 | unchanged — it costs nothing measurable |
+
+A live turn under the new defaults:
+
+```
+sft3_dpo:p2 1.0 · sft3_voice:emolia_c1699 0.25 · burst:soft_hum 0.25
+sft3_quality:genuineness_high 0.25 · blend_high 0.5 · esthetics_high 0.5
+sft3_emotion:Contentment 1.0
+```
+
+This is a trade, not a free win. The stack that shipped before scored the
+highest genuineness of any condition measured (3.21 against 1.90); it bought
+that by loosening the control that keeps the model on script. The new defaults
+give up some of that in exchange for word error 0.018 instead of 0.273.
+
 ## Throughput
 
 The streaming path is batch 1 by necessity — audio has to start before the line

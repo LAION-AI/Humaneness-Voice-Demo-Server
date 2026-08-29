@@ -27,8 +27,8 @@ environment variable too, so nothing here needs a code edit to change.
 | `SFT3_DPO_LORA` | `sft3_dpo:p2` |
 | `SFT3_DPO_LAM` | `1.0` |
 | `SFT3_VOICE_LAM` | `1.0` |
-| `SFT3_EMOTION_LAM` | `1.5` |
-| `PROFILE_LORA_LAM` | `1.0` |
+| `SFT3_EMOTION_LAM` | `1.0` |
+| `PROFILE_LORA_LAM` | `0.25` |
 | `PURE_PROFILE_LAM` | `0.5` |
 | `BASE_STYLE_LORAS` | `()` |
 | `AESTH_LORA` | `voicenet:vn_ESTH__high` |
@@ -96,7 +96,7 @@ environment variable too, so nothing here needs a code edit to change.
 | `BURST_LAM_INTENSE` | `0.5` |
 | `CONTINUITY` | `the same speaker continues without interruption: identical voice, identical person, same microphone and same room.` |
 | `EIV_DIR` | `/mnt/nvme/empathic-insights-voice-small` |
-| `EMOTION_NAMES` | `{'Doubt', 'Relief', 'Disappointment', 'Malevolence_Malice', 'Triumph', 'Intoxication_Altered_States_of_Consciousness', 'Longing', 'Interest', 'Sexual_Lust', 'Confusion', 'Sourness', 'Thankfulness_Grat …` |
+| `EMOTION_NAMES` | `{'Triumph', 'Astonishment_Surprise', 'Distress', 'Malevolence_Malice', 'Anger', 'Concentration', 'Emotional_Numbness', 'Contempt', 'Contentment', 'Sexual_Lust', 'Fear', 'Disappointment', 'Doubt', 'Bit …` |
 | `HISTORY_TURNS_LOCAL` | `8` |
 | `HISTORY_TURNS_LUNA` | `40` |
 | `LLM_BASE` | `http://127.0.0.1:8790` |
@@ -106,13 +106,13 @@ environment variable too, so nothing here needs a code edit to change.
 | `MAX_SESSIONS` | `200` |
 | `MEANVC2_ROOT` | `/mnt/nvme/moss-15-v2-assets/MeanVC2` |
 | `QUALITY_LABELS` | `{'sft3_quality:genuineness_high': 'Genuineness', 'sft3_quality:blend_high': 'Burst blend', 'sft3_quality:esthetics_high': 'Aesthetics'}` |
-| `QUALITY_LORAS` | `{'sft3_quality:genuineness_high': 1.0, 'sft3_quality:blend_high': 1.0, 'sft3_quality:esthetics_high': 1.0}` |
+| `QUALITY_LORAS` | `{'sft3_quality:genuineness_high': 0.25, 'sft3_quality:blend_high': 0.5, 'sft3_quality:esthetics_high': 0.5}` |
 | `SCORE_ATTRS` | `('Arousal', 'Valence', 'Authenticity', 'Confident_vs._Hesitant')` |
 | `SCORE_DEVICE` | `cuda:1` |
 | `SFT3` | `True` |
 | `SFT3_VN_ADAPTERS` | `{'AROU_high': 'highly aroused, very dominant, tense, elated, thin', 'AROU_low': 'dialled down, not performed at full size; narrow pitch range, submissive, slow', 'ARSH_high': 'energised, slightly domi …` |
 | `SFT3_VN_LEVELS` | `(0.25, 0.5, 0.75)` |
-| `SFT3_VN_MAX` | `2` |
+| `SFT3_VN_MAX` | `1` |
 | `SIDON_CKPTS` | `/mnt/nvme/moss-15-v2-assets/sidon-ckpts` |
 | `SIDON_GPU` | `0` |
 | `SIDON_OUT_SR` | `48000` |
