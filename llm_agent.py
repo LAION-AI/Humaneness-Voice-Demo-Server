@@ -9,17 +9,24 @@ say it:
            speaker identity to form the GENERAL: block      -> TTS `instruction`
   script   SCRIPT: block, per-line (cues) and [pause]      -> TTS `instruction`
   voice    the select_reference_voice tool call            -> VoiceBank.select
+  perform  the choose_generation_mode tool call             -> levers.plan
 
-The voice call is a real tool schema (VOICE_TOOL); it is enforced with
-llama.cpp's JSON-schema grammar rather than a second round trip, because a
+Both calls are real tool schemas (VOICE_TOOL, PERFORM_TOOL); they are enforced
+with llama.cpp's JSON-schema grammar rather than a second round trip, because a
 separate tool-call turn would add a full prefill+decode to time-to-first-audio
-for a decision the model can make in the same breath as the line.
+for decisions the model can make in the same breath as the line.
+
+`voice` and `style` choose WHAT to push.  `perform` chooses which of the three
+levers pushes it -- adapter, steering vector, guidance -- and how hard.  The
+server resolves it against the measured coefficient table and may refuse; see
+levers.py and docs/LEVERS.md.
 """
 import json, re, time
 
 import httpx
 
 import config
+import levers
 
 # --------------------------------------------------------------- the tool
 VOICE_TOOL = {
@@ -39,6 +46,44 @@ VOICE_TOOL = {
         "level": "extremely_low | moderately_low | moderately_high | very_high",
         "character": "character voice (mode=character)",
         "edge_case": "scream / sob / laughter type (mode=edge_case)",
+    },
+}
+
+# --------------------------------------------------------------- the second tool
+# Three levers exist, not one.  `select_reference_voice` picks WHAT to push; this picks HOW
+# hard the machine leans on it.  It rides in the same constrained pass as everything else —
+# a separate tool-call turn would add a full prefill+decode to time-to-first-audio for a
+# decision the model can make in the same breath as the line.
+#
+# The vocabulary is deliberately the one the director already has: `dimension` names an
+# emotion, a delivery adapter or a quality axis it has already been shown, and `strength` uses
+# the same three-step shape as everything else it picks.  It never names a number: a language
+# model that is allowed to pick a dose picks it wrong, and every dose here is measured
+# (docs/ADAPTERS.md §4.4).
+PERFORM_TOOL = {
+    "name": "choose_generation_mode",
+    "description": (
+        "Choose how hard the machine leans on the choice you just made. There are three "
+        "levers: the trained adapter (cheap, and the only one that moves voice quality), a "
+        "steering vector added to the model's hidden state while it speaks (much the "
+        "strongest lever for feeling and for manner), and guidance, which runs the model "
+        "twice per frame and costs 1.93x the time. Default to 'auto' unless the moment needs "
+        "more."),
+    "parameters": {
+        "mode": ("auto = let the server pick from what has been measured for this attribute; "
+                 "adapter = the trained adapter alone, cheapest and right for voice quality; "
+                 "adapter+steer = adapter plus the steering vector, the strongest safe "
+                 "combination for an EMOTION; adapter+cfg = adapter plus guidance, for an "
+                 "emotion when steering has not reached the band; steer / cfg = one lever "
+                 "WITHOUT the adapter, for a DELIVERY axis, where the adapter and the "
+                 "steering vector do the same job and must not both be loaded"),
+        "dimension": ("which of the things you already named should be pushed: an emotion "
+                      "name, a delivery adapter name, or a quality axis. Leave it out and the "
+                      "server pushes whatever 'voice' or 'style' already chose."),
+        "strength": ("gentle = half the measured dose, for a moment that only needs a "
+                     "colour; moderate = the measured balanced setting, which keeps every "
+                     "guardrail; strong = the measured high-effect setting, which spends "
+                     "intelligibility and genuineness to get there"),
     },
 }
 
@@ -66,7 +111,7 @@ Match the register the user actually asked for. Do not make a reply sexual or ro
 clearly asked for that; "conspiratorial", "secretive" or "close" mean quiet and confiding, not \
 seductive.
 
-For every turn you produce three things. The words you actually speak are taken from "script" with
+For every turn you produce four things. The words you actually speak are taken from "script" with
 its cues removed, so "script" must contain the complete line, exactly as you want it heard.
 
 ────────────────────────────────────────────────────────
@@ -110,7 +155,43 @@ its cues removed, so "script" must contain the complete line, exactly as you wan
      Do not repeat the condition you used on the previous turn unless the moment truly repeats.
 
 ────────────────────────────────────────────────────────
-2. "delivery" — how this particular line is performed. Write it INTENSELY and specifically, never
+2. "perform" — a choose_generation_mode call. "voice" and "style" say WHAT to push; this says how
+   hard the machine leans on it. Leave it at "auto" and the server uses the setting that was
+   measured for whatever you chose. Reach for it when a moment is not landing.
+
+   FIRST, AND BEFORE ANY OF THIS: reach for a DELIVERY axis rather than pushing a feeling
+   harder. Every one of the three levers below moves the delivery axes 18-20x further than it
+   moves the emotion heads. A delivery adapter in "style" is still the cheapest thing that works.
+
+   "mode" — which levers run.
+   - "auto" is right almost always. It gives an emotion the adapter and the steering vector
+     together, and a delivery axis or a voice quality the adapter alone, because that is what
+     was measured for each.
+   - "adapter" is today's plain behaviour: the trained adapter, nothing else. It is the fastest,
+     and for the QUALITY axes — genuineness, burst blend, aesthetics — it is the only lever that
+     does anything at all. Steering does not move them. Use it whenever latency matters.
+   - "adapter+steer" is the strongest safe setting for an EMOTION. The two levers add cleanly
+     there, and the steering vector is five times the adapter's effect on feeling.
+   - "adapter+cfg" spends 1.93x the generation time to run the model twice per frame. It is the
+     LAST thing to reach for, not the first: use it only for an emotion that the adapter and the
+     steering vector together have not got to where the scene needs it. The reply will not start
+     playing until it is finished, so never use it for a quick answer.
+   - "steer" or "cfg" alone, with no adapter, is for a DELIVERY axis. On a delivery axis the
+     adapter and the steering vector do the same job and get in each other's way, so exactly one
+     of them should be loaded. Pick one; do not stack them.
+
+   "strength" — "moderate" is the measured setting that keeps every guardrail and is the default.
+   "gentle" is half of it. "strong" spends intelligibility, genuineness and burst landing to push
+   further, so use it for a moment that genuinely is at the limit, and come back down afterwards.
+
+   "dimension" is optional: name an emotion, a delivery adapter or a quality axis to push
+   something other than what "voice" already chose. Leave it out in the normal case.
+
+   Some attributes have no measured setting beyond the adapter. Asking for one is not an error —
+   the server falls back to "adapter" and records why. It will never invent a setting for you.
+
+────────────────────────────────────────────────────────
+3. "delivery" — how this particular line is performed. Write it INTENSELY and specifically, never
    generically. It must read like a director briefing an actor, and it must name the same emotion
    you chose in "voice", at the same strength.
 
@@ -137,7 +218,7 @@ its cues removed, so "script" must contain the complete line, exactly as you wan
    capitalised words out letter by letter.
 
 ────────────────────────────────────────────────────────
-3. "script" — the SAME words as "reply", annotated in position. This is where you direct.
+4. "script" — the SAME words as "reply", annotated in position. This is where you direct.
    HARD RULES, measured on this model:
    - EVERY sentence gets its own inline cue in round brackets, placed immediately BEFORE the words
      it affects. Not one cue for the whole reply — one per sentence, and let the arc shift between
@@ -276,13 +357,29 @@ def build_schema(catalog):
                     "required": ["adapter", "strength"],
                 },
             },
+            # WHICH LEVER pushes the choice above, and how hard.  The enums are the
+            # server's, not the model's: `dimension` is drawn from names the model has
+            # already been shown, and `strength` is three words that map to a fixed,
+            # measured dose table.  A number here would be a dose the model invented.
+            "perform": {
+                "type": "object",
+                "properties": {
+                    "mode": {"type": "string", "enum": list(levers.ALL_MODE_WORDS)},
+                    "dimension": enum_or_str(
+                        sorted(set(catalog.get("emotion") or [])
+                               | set(config.SFT3_VN_ADAPTERS)
+                               | set(config.QUALITY_AXES)) or None),
+                    "strength": {"type": "string", "enum": list(levers.STRENGTHS)},
+                },
+                "required": ["mode"],
+            },
             "language": {"type": "string", "enum": ["English", "German"]},
             "delivery": {"type": "string"},
             "script": {"type": "string"},
         },
-        # voice2 and style are required so the grammar forces a decision on them;
-        # left optional the model simply never emitted either one
-        "required": ["voice", "voice2", "style", "speed", "language",
+        # voice2, style and perform are required so the grammar forces a decision on
+        # them; left optional the model simply never emitted them
+        "required": ["voice", "voice2", "style", "perform", "speed", "language",
                      "delivery", "script"],
     }
 
@@ -312,8 +409,23 @@ def render_catalog(catalog, desc):
              "training clips actually sound like, not what the axis is called:")
     for a in sorted(config.SFT3_VN_ADAPTERS):
         L.append(f"  {a} — {config.SFT3_VN_ADAPTERS[a]}")
-    L.append("  strength: 0.25 a touch, 0.5 clearly there, 0.75 strong. "
-             "Leave \"style\" empty when the line needs no colouring beyond the emotion.")
+    lv = ", ".join(f"{x:g}" for x in config.SFT3_VN_LEVELS)
+    L.append(f"  strength: one of {lv} — 0.5 is a touch, 1.0 is clearly there, 1.5 is the "
+             "strongest and still safe. Leave \"style\" empty when the line needs no "
+             "colouring beyond the emotion.")
+    L.append("\nGENERATION MODES — this is what \"perform\".mode picks. Which of the three "
+             "levers leans on the choice above:")
+    L.append("  auto           — the setting measured for whatever you chose. Right almost always.")
+    L.append("  adapter        — the trained adapter alone. Cheapest, and the ONLY lever that "
+             "moves the quality axes.")
+    L.append("  adapter+steer  — adapter plus a steering vector. The strongest safe setting for "
+             "an EMOTION; the two add cleanly there.")
+    L.append("  adapter+cfg    — adapter plus guidance. Costs 1.93x and does not stream. Last "
+             "resort for an emotion, never a first choice.")
+    L.append("  steer, cfg     — one lever WITHOUT the adapter, for a DELIVERY axis, where the "
+             "two do the same job and only one should run.")
+    L.append("  strength: gentle (half the measured dose), moderate (the measured setting that "
+             "keeps every guardrail), strong (spends intelligibility to go further).")
     ch = desc.get("character", {})
     L.append(f"\nCHARACTERS ({len(catalog.get('character', []))}):")
     L.append("  " + "; ".join(f"{c} — {ch[c]}" if c in ch else c
@@ -475,8 +587,9 @@ class LLMAgent:
                                 "d, l, sp, s.")
         else:
             self.schema = build_schema(catalog)
-            self.system = (SYSTEM + "\n\nTool schema:\n"
-                           + json.dumps(VOICE_TOOL, indent=1)
+            self.system = (SYSTEM + "\n\nTool schemas:\n"
+                           + json.dumps(VOICE_TOOL, indent=1) + "\n"
+                           + json.dumps(PERFORM_TOOL, indent=1)
                            + "\n" + render_catalog(catalog, descriptions or {})
                            + _burst_block(bursts))
             if self.hosted_model:
@@ -494,8 +607,14 @@ class LLMAgent:
                     ' "voice2": {same shape, "mode":"none" when the line stays in one state},\n'
                     ' "speed": "much_slower|slower|normal|faster|much_faster",\n'
                     ' "style": [{"adapter": "<one of the DELIVERY ADAPTERS listed below>",\n'
-                    '            "strength": 0.25|0.5|0.75}],   // 0-'
+                    '            "strength": '
+                    + "|".join(f"{x:g}" for x in config.SFT3_VN_LEVELS) + '}],   // 0-'
                     + str(config.SFT3_VN_MAX) + ' entries, [] when none fits\n'
+                    ' "perform": {"mode": "'
+                    + "|".join(levers.ALL_MODE_WORDS) + '",\n'
+                    '             "dimension": "<optional: an emotion, a delivery adapter or a '
+                    'quality axis>",\n'
+                    '             "strength": "' + "|".join(levers.STRENGTHS) + '"},\n'
                     ' "language": "English|German",\n'
                     ' "delivery": "<the GENERAL voice description, prose>",\n'
                     ' "script": "<the spoken line with its inline cues>"}\n'
@@ -676,10 +795,18 @@ class LLMAgent:
         head = (f"the voice of {v.get('character')}." if v.get("mode") == "character"
                 and v.get("character")
                 else (identity or config.SPEAKER_IDENTITY))
+        tail = ("genuine and spontaneous, like a real person in a real moment, not acted. "
+                "pristine high-quality studio recording, no background noise.")
         general = " ".join(x for x in (
-            head, delivery, config.BASE_REGISTER, config.CONTINUITY,
-            "genuine and spontaneous, like a real person in a real moment, not acted. "
-            "pristine high-quality studio recording, no background noise.") if x)
+            head, delivery, config.BASE_REGISTER, config.CONTINUITY, tail) if x)
+        # The SAME block with the performance direction removed, which is the
+        # "unconditional" half of a guidance pair.  Identity, register, continuity and
+        # recording quality are byte-identical in both branches -- only the affect leaves --
+        # so the guidance difference is about how the line is delivered and nothing else.
+        # Built here rather than by regex downstream because this is the only place that
+        # knows which clause was the director's and which are standing.
+        general_unc = " ".join(x for x in (
+            head, config.BASE_REGISTER, config.CONTINUITY, tail) if x)
 
         lang = (out.get("language") or "English").strip()
         out["language"] = "German" if lang.lower().startswith("g") or \
@@ -687,7 +814,21 @@ class LLMAgent:
         out["reply"] = reply
         out["delivery"] = delivery
         out["general"] = general
+        out["general_unc"] = general_unc if delivery else None
         out["script"] = script
         out["instruction"] = f"GENERAL: {general}\nSCRIPT:\n{script}"
+
+        # The mode call.  Unknown words are not an error: they fall back to `auto`, which
+        # resolves from the measured table.  A dose never arrives as a number.
+        pf = out.get("perform")
+        if not isinstance(pf, dict):
+            pf = {}
+        mode = str(pf.get("mode") or "auto")
+        strength = str(pf.get("strength") or "moderate")
+        out["perform"] = {
+            "mode": mode if mode in levers.ALL_MODE_WORDS else "auto",
+            "dimension": (pf.get("dimension") or None),
+            "strength": strength if strength in levers.STRENGTHS else "moderate",
+        }
         out["voice"] = v
         return out

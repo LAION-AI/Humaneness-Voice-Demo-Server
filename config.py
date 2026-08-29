@@ -526,3 +526,120 @@ QUALITY_LABELS = {
 # burst.
 BURST_LAM = float(os.environ.get("MOSS_BURST_LAM", "0.25"))
 BURST_LAM_INTENSE = float(os.environ.get("MOSS_BURST_LAM_INTENSE", "0.5"))
+
+# ---------------------------------------------------------------- generation modes
+# THE THREE LEVERS.  Until now this server had exactly one way to shape a performance:
+# load adapters and write a good prompt.  Two more have since been measured on this
+# checkpoint, together with how all three combine, and they are offered here as switchable
+# modes.  docs/LEVERS.md is the write-up; the short version:
+#
+#   adapter        today's behaviour.  Merge weights.  The only lever that moves the quality
+#                  axes at all (+0.399, t 6.0) and the cheapest everywhere.
+#   adapter+steer  plus a difference-of-means direction added to the hidden state.  On the
+#                  emotion heads the two are cleanly additive (interaction +0.038, t 1.36),
+#                  and steering is five times the adapter's effect there (+0.384 t 9.4
+#                  against +0.077 t 2.8).
+#   adapter+cfg    plus classifier-free guidance on the delivery condition.  Costs 1.93x.
+#   steer / cfg    one lever without the attribute's own adapter.  For the delivery axes,
+#                  where adapter and steering are significantly SUB-additive (-0.164,
+#                  t -3.7) and the right move is to pick one rather than stack them.
+#
+# Default is `auto`, which resolves per family from the measurements: emotion ->
+# adapter+steer, delivery -> adapter, quality -> adapter.  `auto` never spends guidance.
+# Source: research-log-2026-08/combination-study/ in LAION-AI/Voice-Acting-Pipeline-WIP.
+GEN_MODE = os.environ.get("MOSS_GEN_MODE", "auto")
+# Both levers are individually killable, and with either off the modes that need it degrade
+# to `adapter` and say so in the response payload rather than reporting a mode that is not
+# running (docs/LEARNINGS.md: a dial that reads a value while the thing it names is off is
+# worse than no dial).
+STEER_ENABLED = os.environ.get("MOSS_STEER", "1") not in ("0", "false", "")
+CFG_ENABLED = os.environ.get("MOSS_CFG", "1") not in ("0", "false", "")
+# Whether the director may choose the mode at all.  Off, every turn uses GEN_MODE.
+AGENT_PICKS_MODE = os.environ.get("MOSS_AGENT_PICKS_MODE", "1") not in ("0", "false", "")
+
+# ---- steering ----------------------------------------------------------------
+# The vectors.  ~5 MB distilled from the 112 MB research file by
+# setup/build_steering_pack.py; NOT committed to this repository.  With no file here every
+# steering mode degrades to `adapter`.  See docs/LEVERS.md.
+STEER_PACK = os.environ.get("MOSS_STEER_PACK",
+                            "/mnt/nvme/moss-15-v2-assets/steering/p3_vectors_server.npz")
+# Only needed when STEER_PACK points at the raw research .npz instead of the distilled pack.
+STEER_TAP_RANK = os.environ.get("MOSS_STEER_TAP_RANK",
+                                "/mnt/nvme/moss-15-v2-assets/steering/tap_rank.json")
+# How many of each dimension's own top layers the distilled pack carries.  5 covers every
+# shipped k; the delivery axes are the only family that wants more than 1.
+STEER_PACK_K = int(os.environ.get("MOSS_STEER_PACK_K", "5"))
+# alpha is DIMENSIONLESS: the fraction of the hidden state's own magnitude added along the
+# direction.  0.10 at the attribute's own top layer is the free setting -- emotion percentile
+# 0.4354 -> 0.5840 with word error FALLING.  Everything breaks above 0.3, and at 0.5 a random
+# direction of matched norm does the same damage, which is how an earlier round concluded
+# wrongly that steering never works.
+STEER_ALPHA = float(os.environ.get("MOSS_STEER_ALPHA", "0.10"))
+# Hard ceiling on any SINGLE component.  0.15 is half the measured break point, and no
+# shipped recipe exceeds it.
+STEER_ALPHA_CEILING = float(os.environ.get("MOSS_STEER_ALPHA_CEILING", "0.15"))
+# Hard ceiling on the REALISED magnitude at any one layer, which is a different number,
+# because two components that share a layer sum there and the sum is not the larger alpha.
+# It is not even the quadrature sum: cos(emotion direction, quality axis) runs -0.62 to
+# -0.95 in this representation, so SUBTRACTING Emotional_Numbness adds almost entirely
+# ALONG the emotion direction rather than orthogonally to it.  Measured over the 40 emotion
+# recipes with the numbness subtraction attached, the realised magnitude at the shared layer
+# runs to 0.1926 (emo:Interest at h20; Elation 0.1907, Amusement 0.1781) -- and those are the
+# compositions the study actually ran and scored, so a ceiling at 0.15 would refuse a
+# measured recipe.  0.25 sits above every one of them and well below the 0.30 at which
+# steering collapses.  Above this the composition is REFUSED rather than trimmed: a trimmed
+# composition is not the one that was measured.
+STEER_REALISED_CEILING = float(os.environ.get("MOSS_STEER_REALISED_CEILING", "0.25"))
+# k is per attribute and small.  Emotion is free only at k = 1; the quality axes break at
+# k >= 2 (genuineness -2.81 at k = 5); the delivery axes want 3-5.  A recipe from the wiki
+# overrides this; it is the fallback when the wiki's own point does not use steering.
+STEER_K = {"emo": 1, "vn": 3, "qual": 0}
+# The director's three strength words scale the recipe's alpha.  A language model that is
+# allowed to pick a dose picks it wrong, and these are measured -- so the words map to a
+# fixed table here and never reach the model as numbers.
+STRENGTH_ALPHA_SCALE = {"gentle": 0.5, "moderate": 1.0, "strong": 1.0}
+# Subtracting Emotional_Numbness at -0.10 returns +0.60 of genuineness (t 9.64, on 67 of 80
+# prompts) at NO cost in emotion when the adapter is carrying the emotion.  It rides along
+# automatically on any emotion turn where the steering machinery is already running.
+#   with_steer  attach it whenever an emotion is steered            (default)
+#   off         never
+# It is deliberately not "always": attaching it to a bare `adapter` turn would mean `adapter`
+# is no longer bit-for-bit today's behaviour, and that mode is the fallback for everything.
+NUMBNESS_SUBTRACTION = os.environ.get("MOSS_NUMBNESS", "with_steer")
+
+# ---- guidance ----------------------------------------------------------------
+# logits = logits_uncond + g * (logits_cond - logits_uncond).  g = 1 cancels the
+# unconditional term exactly and IS ordinary sampling, so it is the control and the "off"
+# value.  Below 1 guidance actively hurts (-0.0370 at g = 0.5, t -2.56).
+CFG_G = {"emo": 3.0, "vn": 2.5, "qual": 2.5}
+CFG_G_MIN = float(os.environ.get("MOSS_CFG_G_MIN", "1.5"))
+CFG_G_MAX = float(os.environ.get("MOSS_CFG_G_MAX", "3.0"))
+# Measured at batch 1: 1.89-1.94x over four cells, sd 0.053.  The intuition that only the
+# semantic transformer doubles is wrong -- the local transformer doubles too, running twelve
+# times per frame per branch, and the codec decode, the only genuinely shared component, is
+# 1.6 % of the total.  ADAPTERS.md §1 records realtime factor 1.0 as the streaming budget and
+# the live merged baseline as 0.764, so 1.93x lands at ~1.47 and the stream would underrun.
+# CFG therefore renders the take whole and then plays it; see docs/LEVERS.md.
+CFG_COST_FACTOR = float(os.environ.get("MOSS_CFG_COST", "1.93"))
+# When steering and guidance are both on, steer BOTH branches rather than only the
+# conditioned one: it keeps 82 % of the effect and returns 0.209 of word error and 0.75 of
+# genuineness.  The combined interaction is the only real synergy in the study and every
+# damage term it carries has a larger |t| than the gain, so the cheaper wiring is the default.
+CFG_STEER_BRANCH = os.environ.get("MOSS_CFG_STEER_BRANCH", "both")
+
+# ---- what the levers push ----------------------------------------------------
+# The three perceptual axes, by the name the director already uses for them.
+QUALITY_AXES = ("genuineness_high", "blend_high", "esthetics_high")
+# On a delivery axis the adapter and the steering vector do the same job and are
+# significantly sub-additive, so exactly one of them runs.  "adapter" keeps the incumbent --
+# the delivery adapters are the best-behaved family in the stack and were evaluated at scale
+# on this hardware, which the steering vectors have not been.  "steer" picks the other.
+DELIVERY_LEVER = os.environ.get("MOSS_DELIVERY_LEVER", "adapter")
+
+# The generated coefficient table: one entry per attribute, with the balanced and high-effect
+# operating points and the measured cost of each on all five guardrails.  Produced by
+# wikiskills/code/build_wikiskills.py in the research log.  Absent, steering and guidance are
+# refused for want of a measured setting -- the server never invents one.
+WIKI_COEFFICIENTS = os.environ.get(
+    "MOSS_WIKI_COEFFICIENTS",
+    "/mnt/nvme/moss-15-v2-assets/wikiskills/coefficients.json")
