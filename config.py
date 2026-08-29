@@ -461,10 +461,22 @@ SFT3_VN_ADAPTERS = {
     "VOLT_high":   "volatile, heavy breath, slurred, cool timbre, dark",
     "VULN_high":   "dialled down, involuntary rather than performed, in every breath, impossible to hide",
 }
-# The director picks one of these merge weights.  The sweep that produced 1.5 for
-# the emotion adapters has NOT been repeated on this set, and the set has not
-# been evaluated at all, so the demo stays well under the trained value of 1.0.
-SFT3_VN_LEVELS = (0.25, 0.5, 0.75)
+# The director picks one of these merge weights.  The set HAS now been evaluated:
+# a 5,740-cell dose-response sweep of 79 adapters at six weights, scored against
+# each axis's own VoiceNet regression rather than against side effects alone.
+#
+#   * 16 of these 17 adapters have a usable weight -- the best-behaved family in
+#     the whole stack, 12 monotone and 4 saturating.
+#   * The median safe AND strong weight is 1.5, not 0.75.
+#   * Going 0.75 -> 1.5 buys +0.375 on the target axis (t 5.18, better on 15 of
+#     17 adapters) for a word-error change of +0.003 -- t 0.55, i.e. none.
+#     Individual gains reach +1.37 (S_RANT_high) against a noise floor of ~0.15.
+#
+# The 0.75 ceiling was set when two delivery axes could run at once; SFT3_VN_MAX
+# is 1, so that reason no longer applies.  Stacking is still untested, so if
+# SFT3_VN_MAX is ever raised above 1 this ladder should come back down with it.
+# Source: research-log-2026-08/lora-dose/ in LAION-AI/Voice-Acting-Pipeline-WIP.
+SFT3_VN_LEVELS = (0.5, 0.75, 1.0, 1.25, 1.5)
 # One delivery axis costs little; two took word error from 0.041 to 0.143 and put
 # invented words in half the takes.  The director gets one.
 SFT3_VN_MAX = int(os.environ.get("MOSS_SFT3_VN_MAX", "1"))
@@ -479,6 +491,25 @@ SFT3_VN_MAX = int(os.environ.get("MOSS_SFT3_VN_MAX", "1"))
 # Genuineness is the one that has to stay low — it raises its own score only
 # below 0.5 and collapses intelligibility above 1.0 (0.176 at 1.25).  Blend is
 # safe at any weight measured.  See docs/EXPERIMENTS.md.
+# ---------------------------------------------------------------- interference
+# Pairs of adapters measured to work against each other.  These are not style
+# preferences; they are measurements, and composing them produces neither effect.
+#
+#   ESTH x S_RANT: pushing the aesthetic axis alone moves it +0.196..+0.317;
+#   pushing ranting alone moves S_RANT +0.464 (t 7.01, on 12 of 12 prompts).
+#   Both at the same strength: -0.012, indistinguishable from zero.  The two
+#   directions are close to opposed in the model's representation.
+#
+# When a delivery axis in the key of this table is active, the paired quality
+# adapter is scaled by the factor given rather than silently fighting it.
+# Source: research-log-2026-08/layer-forensics/w3/ (arm G) and combination-study/.
+QUALITY_CONFLICTS = {
+    "sft3_quality:esthetics_high": {
+        "S_RANT_high": 0.0,     # measured to cancel outright
+        "S_DRAM_high": 0.5,     # same family, untested pairwise -- halve, do not drop
+    },
+}
+
 QUALITY_LORAS = {
     "sft3_quality:genuineness_high": float(os.environ.get("MOSS_LAM_GENUINE", "0.25")),
     "sft3_quality:blend_high":       float(os.environ.get("MOSS_LAM_BLEND", "0.5")),

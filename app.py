@@ -593,6 +593,24 @@ async def turn(req: Request):
                     vn_spec.append((nm, lam))
                 if len(vn_spec) >= config.SFT3_VN_MAX:
                     break
+        # ------------------------------------------------------------------
+        # Measured interference.  A quality adapter that is known to cancel the
+        # delivery axis now in play is scaled down rather than left to fight it:
+        # ESTH and S_RANT at equal strength produce neither effect (+0.464 alone
+        # against -0.012 together).  See config.QUALITY_CONFLICTS.
+        if q_spec and vn_spec:
+            active_vn = {nm.split(":", 1)[-1] for nm, _ in vn_spec}
+            adjusted = []
+            for nm, lam in q_spec:
+                rule = getattr(config, "QUALITY_CONFLICTS", {}).get(nm, {})
+                factor = min([rule[a] for a in active_vn if a in rule], default=1.0)
+                if factor < 1.0:
+                    print(f"[lora] {nm} {lam:g} -> {lam * factor:g}: measured to "
+                          f"conflict with {sorted(active_vn & set(rule))}", flush=True)
+                if lam * factor > 0.001:
+                    adjusted.append((nm, lam * factor))
+            q_spec = adjusted
+
         dpo_spec = []
         if lb and body.get("dpo_lora", True) is not False \
                 and config.SFT3_DPO_LORA in lb.repos and config.SFT3_DPO_LAM > 0.001:
