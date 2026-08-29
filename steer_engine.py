@@ -205,8 +205,9 @@ class VectorPack:
             self.available = bool(self._vec)
         except Exception as e:                      # noqa: BLE001 - never fail start-up
             self.error = f"{type(e).__name__}: {e}"
-            print(f"[steer] vectors unavailable ({self.error}); "
-                  "steering modes will fall back to adapter", flush=True)
+            print(f"[steer] vectors unavailable ({self.error}); steering modes will fall "
+                  "back to adapter. Guidance does NOT need this file and is unaffected.",
+                  flush=True)
 
     # -- loading ------------------------------------------------------------
     def _load(self):

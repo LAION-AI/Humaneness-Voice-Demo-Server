@@ -476,10 +476,13 @@ vector together, because on emotions the two are cleanly additive; gives a
 alone, because steering does not move it at all; and never spends guidance,
 which costs **1.93×** and therefore does not stream.
 
-Every mode is switchable off, and both new levers need an asset that is not in
-this repository — a 5.3 MB vector pack and the measured coefficient table. With
-neither present the server behaves exactly as it did before, and says so in
-`/api/state` and in every response payload.
+Every mode is switchable off. Two assets that are not in this repository make
+the levers measured rather than defaulted — a 5.3 MB vector pack and the
+coefficient table — and **each lever is gated only on what it actually uses**:
+guidance needs neither, steering needs the vector pack, and the coefficient
+table is what `auto` reads to pick a per-attribute operating point. With nothing
+installed, `auto` asks for no lever and the server behaves exactly as it did
+before; every degrade is reported in `/api/state` and in the response payload.
 
 > The evidence for each of those defaults, what the modes cost, why guidance is
 > rendered rather than streamed, and where the assets come from, are in

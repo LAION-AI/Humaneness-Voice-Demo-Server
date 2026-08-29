@@ -171,8 +171,15 @@ def check_resolver(wiki, pack):
           by[("steer", "S_RANT_high")].drop_adapter == "sft3_voicenet:S_RANT_high"
           or not by[("steer", "S_RANT_high")].steer,
           by[("steer", "S_RANT_high")].mode)
-    check("an attribute with no measured point is refused, not guessed",
-          by[("adapter+steer", "Bitterness")].mode == "adapter")
+    # An attribute with no passing operating point: `auto` asks for nothing, and an
+    # EXPLICIT request runs on the documented family default with `family_default` in the
+    # payload.  What is never invented is a per-attribute number nobody measured.
+    check("an explicit lever on an attribute with no passing point runs on the family "
+          "default and labels it",
+          by[("adapter+steer", "Bitterness")].operating_point == "family_default"
+          and any("clears the guardrails" in r
+                  for r in by[("adapter+steer", "Bitterness")].reasons),
+          by[("adapter+steer", "Bitterness")].mode)
     check("an unknown mode word falls back to auto rather than failing",
           by[("nonsense", "Anger")].mode in levers.MODES)
     check("no attribute named -> adapter",
@@ -338,6 +345,55 @@ def check_injector():
           and steer_engine.NULL.apply_loc(x) is x)
 
 
+# -------------------------------------------------- 5. each lever gates on what it uses
+def check_gates(wiki, pack):
+    """Guidance must not be held up by the file it does not use.
+
+    Reported by the demo team against the first version, and they were right: gating both
+    levers on the coefficient table meant the 0.4 MB download blocked the lever that needs
+    no vectors at all.
+    """
+    print("\n5. per-lever gating")
+    none_wiki = levers.Wiki("/nonexistent-coefficients.json")
+
+    def m(mode, wk, pk, name="Anger"):
+        return levers.plan(mode, name, "moderate", wiki=wk, pack=pk,
+                           active_delivery_adapters=set(),
+                           attribute_adapter="sft3_emotion:Anger", cfg_available=True)
+
+    check("guidance runs with NO assets at all when asked for explicitly",
+          m("adapter+cfg", none_wiki, None).mode == "adapter+cfg"
+          and m("adapter+cfg", none_wiki, None).guidance > 1.0,
+          m("adapter+cfg", none_wiki, None).mode)
+    check("steering still needs the vector pack",
+          m("adapter+steer", wiki, None).mode == "adapter")
+    check("steering runs on the pack alone, using the ranking embedded in it",
+          m("adapter+steer", none_wiki, pack).mode == "adapter+steer"
+          if pack else True,
+          m("adapter+steer", none_wiki, pack).mode if pack else "no pack to test with")
+    check("a lever on a family default says so rather than implying a measured row",
+          m("adapter+cfg", none_wiki, None).operating_point == "family_default")
+    check("`auto` stays strict and asks for no lever without a measured row",
+          m("auto", none_wiki, pack).mode == "adapter"
+          and not m("auto", none_wiki, pack).steer)
+    check("`auto` also refuses on an attribute whose row has no operating point",
+          m("auto", wiki, pack, "Bitterness").mode == "adapter")
+    check("but an explicit request on that attribute runs on the family default",
+          m("adapter+cfg", wiki, pack, "Bitterness").mode == "adapter+cfg")
+    # The refusals that are FINDINGS, not missing recipes, must survive with no wiki at all.
+    check("the quality-axis refusal survives with no coefficient table",
+          not m("adapter+steer", none_wiki, pack, "genuineness_high").steer if pack
+          else True)
+    check("the low-tail refusal survives with no coefficient table",
+          not m("adapter+steer", none_wiki, pack, "AROU_low").steer if pack else True)
+    check("a mode with no lever in it reports no operating point",
+          m("adapter+steer", wiki, None).operating_point is None,
+          str(m("adapter+steer", wiki, None).operating_point))
+    check("steering_key() agrees with the wiki's own mapping",
+          all(levers.steering_key(a.split("/", 1)[1]) == v["steering_key"]
+              for a, v in wiki.attributes.items()) if wiki.available else True)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--pack", default=config.STEER_PACK)
@@ -352,6 +408,10 @@ def main():
         print("\n2. mode resolution — skipped, no coefficient table")
     check_neutralise()
     check_injector()
+    if wiki.available or pack.available:
+        check_gates(wiki, pack if pack.available else None)
+    else:
+        print("\n5. per-lever gating — skipped, neither asset installed")
     print()
     if FAIL:
         print(f"{len(FAIL)} FAILED: {FAIL}")

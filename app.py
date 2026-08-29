@@ -271,6 +271,9 @@ async def state():
             "agent_picks_mode": config.AGENT_PICKS_MODE,
             "steer": {
                 "enabled": config.STEER_ENABLED,
+                # steering needs a direction and the layers to put it at, and only the
+                # vector pack has either
+                "needs": ["steer_pack"],
                 "available": bool(STATE["vectors"] and STATE["vectors"].available),
                 "dimensions": len(STATE["vectors"].names) if STATE["vectors"] else 0,
                 "error": STATE["vectors"].error if STATE["vectors"] else "not loaded",
@@ -279,14 +282,21 @@ async def state():
             },
             "cfg": {
                 "enabled": config.CFG_ENABLED,
+                # guidance needs neither asset: `g` has a family default measured in the
+                # CFG study, and the neutralised branch is built from the turn's own prompt
+                "needs": [],
+                "available": config.CFG_ENABLED,
                 "cost_factor": config.CFG_COST_FACTOR,
                 "streams": False,
                 "g": config.CFG_G,
             },
             "wiki": {
+                # the coefficient table is what `auto` reads.  Without it `auto` asks for no
+                # lever; an explicitly requested one still runs, on its family default.
                 "available": bool(STATE["wiki"] and STATE["wiki"].available),
                 "attributes": len(STATE["wiki"].attributes) if STATE["wiki"] else 0,
                 "error": STATE["wiki"].error if STATE["wiki"] else "not loaded",
+                "gates": "auto; per-attribute operating points",
             },
             "delivery_lever": config.DELIVERY_LEVER,
         },
