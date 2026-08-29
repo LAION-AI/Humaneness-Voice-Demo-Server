@@ -143,8 +143,10 @@ def render(script, speed=1.0, budget_frames=None):
     # a gap before the first word and after the last, as the format expects
     if seq and seq[0][0] != "pause":
         seq.insert(0, ("pause", None, LEAD_PAUSE))
-    if seq and seq[-1][0] != "pause":
+    if TAIL_PAUSE > 0 and seq and seq[-1][0] != "pause":
         seq.append(("pause", None, TAIL_PAUSE))
+    while seq and seq[-1][0] == "pause":
+        seq.pop()                      # never end on silence the model must fill
 
     total = round(sum(s for _, _, s in seq), 1)
     frames = int(round(total * config.FRAME_RATE))

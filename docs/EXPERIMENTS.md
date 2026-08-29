@@ -334,6 +334,64 @@ highest genuineness of any condition measured (3.21 against 1.90); it bought
 that by loosening the control that keeps the model on script. The new defaults
 give up some of that in exchange for word error 0.018 instead of 0.273.
 
+## Experiment 7 — the stop-token brake does nothing here
+
+`stop_bias` subtracts a constant from the end token's logit before sampling, so
+a positive value makes stopping *less* likely. It exists because takes used to
+end early, truncating the line. Against the opposite complaint it is pointing the
+wrong way, and turning it up makes things worse rather than better.
+
+Swept on the default stack, ten utterances each:
+
+| stop_bias | word error | extra words | takes w/ extra |
+|--:|--:|--:|--:|
+| −3.0 | 0.047 | 0.5 | 20% |
+| −2.0 | 0.069 | 0.8 | 30% |
+| −1.0 | 0.076 | 0.9 | 30% |
+| −0.5 | 0.076 | 0.9 | 30% |
+| 0.0 | 0.076 | 0.9 | 30% |
+| +1.0 | 0.176 | 1.1 | 30% |
+| +3.0 | 0.027 | 0.4 | 20% |
+| +4.0 | 0.054 | 0.2 | 20% |
+
+−1.0, −0.5 and 0.0 produce **bit-identical** results, through two different code
+paths. The continue-or-end decision is never marginal: a few nats do not move it,
+because it is not what decides when the take ends.
+
+## Experiment 8 — what does decide when the take ends
+
+The audio matches the requested duration to within 0.02 s in every condition
+measured, clean or degraded. The model stops when the **time budget** is used up,
+not when the sentence is finished — so any budget it does not need for the words
+gets filled, and what fills it is invented speech.
+
+Two things set that budget: the seconds-per-word rate the script is rendered at,
+and the closing `[N.N seconds pause]` the renderer used to append. Three seeds
+per condition, ten utterances each, mean over seeds:
+
+| prompt shape | word error | extra words | tail s |
+|---|--:|--:|--:|
+| duration tags @4.5 f/word, closing pause (what shipped) | 0.055 | 0.53 | 0.56 |
+| duration tags @4.0, closing pause | 0.044 | 0.30 | 0.47 |
+| no duration tags at all, @4.5 | 0.048 | 0.53 | 0.48 |
+| plain text, `tokens = words × 6`, no tags at all | 0.138 | 0.90 | 1.36 |
+| no closing pause, @4.5 | 0.088 | 0.53 | 0.51 |
+| **no closing pause, @4.0** | **0.025** | **0.03** | **0.38** |
+| no closing pause and no opening pause, @4.0 | 0.036 | 0.13 | 0.41 |
+
+Neither change alone is enough — the closing pause at 4.5 still invents words in
+20–40 % of takes, and 4.0 with a closing pause still does at 10–20 %. Together
+they are the only configuration that held at 0–10 % across all three seeds.
+
+Worth recording because it was the intuitive suspect: **removing the timing tags
+does not help.** The plain-text shape, which is what this demo used before the
+timed format, is the *worst* row in the table — tail 1.36 s and 0.90 invented
+words. The timed format is not the cause; an over-generous budget inside it is.
+
+**Adopted:** `TIMED_FRAMES_PER_WORD` 4.5 → 4.0, and `timed_script.render` no
+longer appends a closing pause — it will not end a script on silence the model
+still owes.
+
 ## Throughput
 
 The streaming path is batch 1 by necessity — audio has to start before the line

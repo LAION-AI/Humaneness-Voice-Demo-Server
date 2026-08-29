@@ -26,7 +26,13 @@ from eval_scale import Scorers, ANCHOR, DPO
 URL = "http://127.0.0.1:8792/api/say_batch"
 
 
-def build_items(n):
+def build_items(n, fpw=None):
+    if fpw is not None:
+        config.TIMED_FRAMES_PER_WORD = float(fpw)
+    return _build_items(n)
+
+
+def _build_items(n):
     items, refs = [], []
     for line, cue in PROMPTS[:n]:
         tagged, frames, _ = timed_script.render(f"{cue} {line}")
@@ -37,9 +43,12 @@ def build_items(n):
     return items, refs
 
 
-def run(cond, loras, items, refs, asr, sc, seed=1234):
-    r = requests.post(URL, json={"items": items, "loras": [[n, l] for n, l in loras],
-                                 "seed": seed, "anchor_path": ANCHOR}, timeout=3600)
+def run(cond, loras, items, refs, asr, sc, seed=1234, stop_bias=None):
+    body = {"items": items, "loras": [[n, l] for n, l in loras],
+            "seed": seed, "anchor_path": ANCHOR}
+    if stop_bias is not None:
+        body["stop_bias"] = float(stop_bias)
+    r = requests.post(URL, json=body, timeout=3600)
     r.raise_for_status()
     j = r.json()
     rows = []
@@ -81,6 +90,7 @@ def main():
                     help="quality | voice | voicenet | emotion | baseline")
     ap.add_argument("--scales", default="0.25,0.5,0.75,1.0,1.25,1.5")
     ap.add_argument("--n", type=int, default=10)
+    ap.add_argument("--seed", type=int, default=1234)
     ap.add_argument("--out", default="")
     a = ap.parse_args()
     scales = [float(x) for x in a.scales.split(",") if x.strip()]
@@ -88,6 +98,82 @@ def main():
 
     items, refs = build_items(a.n)
     asr, sc = ASR(), Scorers()
+    if a.set == "fmt":
+        # Does the duration tag itself cause the padding?  Four prompt shapes,
+        # same words, same adapters.
+        import re as _re
+        G, B, E = ("sft3_quality:genuineness_high", "sft3_quality:blend_high",
+                   "sft3_quality:esthetics_high")
+        stack = [(DPO, 1.0), (G, 0.25), (B, 0.5), (E, 0.5),
+                 ("sft3_voice:emolia_c1699", 0.25),
+                 ("sft3_emotion:Amusement", 1.0)]
+        def mk(mode, fpw):
+            config.TIMED_FRAMES_PER_WORD = fpw
+            its, rfs = [], []
+            for line, cue in PROMPTS[:a.n]:
+                tagged, frames, plain = timed_script.render(f"{cue} {line}")
+                if mode in ("no_tail", "no_edges"):
+                    # drop the closing [N.N seconds pause] the renderer appends
+                    tagged = _re.sub(r"\s*\[[0-9.]+ seconds pause\]\s*$", "", tagged)
+                    if mode == "no_edges":
+                        tagged = _re.sub(r"^\s*\[[0-9.]+ seconds pause\]\s*", "", tagged)
+                    secs = sum(float(m) for m in
+                               _re.findall(r"\[([0-9.]+) seconds (?:duration|pause)\]", tagged))
+                    secs += sum(float(m) for m in
+                                _re.findall(r",\s*([0-9.]+) seconds\)", tagged))
+                    frames = max(24, int(round(secs * 12.5)))
+                elif mode == "no_duration":
+                    tagged = _re.sub(r"\[[0-9.]+ seconds duration\]\s*", "", tagged)
+                elif mode == "plain":
+                    tagged = f"{cue} {line}"
+                    frames = int(len(line.split()) * config.TOKENS_PER_WORD)
+                its.append({"text": tagged, "tokens": frames, "language": "English",
+                            "instruction": f"GENERAL: {GENERAL}; {frames/12.5:.1f}s, EN."
+                                           f"\nSCRIPT:\n{tagged}"})
+                rfs.append(line)
+            return its, rfs
+        res = []
+        for label, mode, fpw in [("no trailing pause @4.5", "no_tail", 4.5),
+                                 ("no trailing pause @4.0", "no_tail", 4.0),
+                                 ("no trailing pause, no lead @4.0", "no_edges", 4.0),
+                                 ("timed tags @4.5", "timed", 4.5),
+                                 ("timed tags @4.0", "timed", 4.0),
+                                 ("pauses+bursts, no duration tags", "no_duration", 4.5),
+                                 ("plain text, tokens=words*6", "plain", 4.5)]:
+            for sd in (1234, 777, 42):
+                it, rf = mk(mode, fpw)
+                rec = run(f"{label} | seed {sd}", stack, it, rf, asr, sc, seed=sd)
+                if not rec:
+                    continue
+                res.append(rec)
+                json.dump(res, open(out_p, "w"), indent=1)
+                print(f'{label:34s} seed {sd}  wer={rec["wer"]:.3f} '
+                      f'extra={rec["extra_w"]:4.1f}({rec["pct_extra"]:.0%}) '
+                      f'tail={rec["tail_s"]:.2f}s', flush=True)
+        print("SWEEP_DONE", flush=True)
+        return
+    if a.set == "fpw":
+        # the duration budget itself: seconds per word asked for in the prompt
+        G, B, E = ("sft3_quality:genuineness_high", "sft3_quality:blend_high",
+                   "sft3_quality:esthetics_high")
+        stack = [(DPO, 1.0), (G, 0.25), (B, 0.5), (E, 0.5),
+                 ("sft3_voice:emolia_c1699", 0.25),
+                 ("sft3_emotion:Amusement", 1.0)]
+        res = []
+        for fpw in [float(x) for x in os.environ.get("FPW_LIST","3.0,3.5,4.0,4.5,5.0,5.5").split(",")]:
+            it, rf = build_items(a.n, fpw)
+            rec = run(f"frames/word {fpw}", stack, it, rf, asr, sc, seed=a.seed)
+            if not rec:
+                continue
+            rec["fpw"] = fpw
+            res.append(rec)
+            json.dump(res, open(out_p, "w"), indent=1)
+            print(f'frames/word {fpw:<4} wer={rec["wer"]:.3f} '
+                  f'extra={rec["extra_w"]:4.1f}({rec["pct_extra"]:.0%}) '
+                  f'tail={rec["tail_s"]:.2f}s genuine={rec["genuineness"]:.2f}',
+                  flush=True)
+        print("SWEEP_DONE", flush=True)
+        return
     todo = []
     if a.set == "baseline":
         todo = [("baseline sft3+dpo", [])]
@@ -103,6 +189,16 @@ def main():
     elif a.set == "emotion":
         for n in adapters_of("sft3_emotion"):
             todo += [(f"{n} @{w}", [(f"sft3_emotion:{n}", w)]) for w in scales]
+    elif a.set == "stopbias":
+        # the brake was built against lines that stopped too early; the current
+        # complaint is the opposite, so this walks it through zero into negative
+        G, B, E = ("sft3_quality:genuineness_high", "sft3_quality:blend_high",
+                   "sft3_quality:esthetics_high")
+        stack = [(G, 0.25), (B, 0.5), (E, 0.5),
+                 ("sft3_voice:emolia_c1699", 0.25),
+                 ("sft3_emotion:Amusement", 1.0)]
+        todo = [(f"stop_bias {sb:+.1f}", stack) for sb in
+                (-3.0, -2.0, -1.0, -0.5, 0.0, 1.0, 3.0, 4.0)]
     elif a.set == "combo":
         # built from the single-adapter results: genuineness is only safe low,
         # blend is safe anywhere, esthetics costs genuineness, voice buys
@@ -153,7 +249,10 @@ def main():
         if cond in done:
             continue
         try:
-            rec = run(cond, [(DPO, 1.0)] + extra, items, refs, asr, sc)
+            sb = None
+            if a.set == "stopbias":
+                sb = float(cond.split()[-1])
+            rec = run(cond, [(DPO, 1.0)] + extra, items, refs, asr, sc, stop_bias=sb)
         except Exception as e:
             print(f"  {cond}: {str(e)[:140]}", flush=True)
             continue

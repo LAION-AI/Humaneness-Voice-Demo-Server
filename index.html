@@ -227,10 +227,10 @@
       Speaker-LoRA
       <input id="spk" type="range" min="0" max="2" step="0.05" value="1">
       <b id="spkv">1.00</b></label>
-    <label title="ESTH high — Klangaesthetik/Politur. Eigene Dimension, kein Schauspiel-Regler. 0 = aus.">
+    <label title="sft3_quality:esthetics_high — Klangpolitur. Verstaendlichkeitsneutral, kostet aber Genuineness: gemessen 1.64 bei 0.25 gegen 0.79 bei 1.25. 0 = aus.">
       Ästhetik
-      <input id="aes" type="range" min="0" max="2" step="0.05" value="0">
-      <b id="aesv">0.00</b></label>
+      <input id="aes" type="range" min="0" max="2" step="0.05" value="0.5">
+      <b id="aesv">0.50</b></label>
     <label title="Druck gegen das Stop-Token, in nats. Hoeher = der Satz wird seltener zu frueh abgebrochen. 0 = unveraendert.">
       Satz-Ende bremsen
       <input id="stopb" type="range" min="0" max="4" step="0.25" value="3.0">
@@ -439,9 +439,13 @@ async function send(){
                             emotion_nuance: $('emonuance').checked,
                             char_lora: $('charlora').checked,
                             speaker_lora_lam: parseFloat($('spk').value),
-                            aesth_lora_lam: parseFloat($('aes').value),
+
                             stop_bias: parseFloat($('stopb').value),
-                            ...adpPayload()})
+                            ...(()=>{ const q=adpPayload();
+                                 // the Aesthetics slider is the same adapter the
+                                 // overlay lists, so it writes into the same field
+                                 q.quality_lams['sft3_quality:esthetics_high']=parseFloat($('aes').value);
+                                 return q; })()})
     });
     if(!res.ok){ addMsg('bot','⚠ '+res.status+' '+await res.text()); throw new Error('http'); }
 

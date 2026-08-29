@@ -131,7 +131,10 @@ def _snap(repo, local=None):
 # Only what fits: the full 168 GB of published adapters does not go on this disk.
 # See PLAN_LORA.md for what was left out and why.
 LORA_ROOTS = {
-    "emotion":   _snap("TTS-AGI/moss-emotion-loras-v3"),
+    # Parked with the rest of the v2-era sets: trained against the untuned
+    # weights, and reachable by the legacy planner even when the SFT3 emotion
+    # adapter was switched off.  The SFT3 set replaces it.
+    # "emotion": _snap("TTS-AGI/moss-emotion-loras-v3"),
     "character": _snap("TTS-AGI/moss-character-loras-refined-public"),
     # SFT3-native burst adapters (71), replacing the v2-era set.
     # "burst":   _snap("laion/vocal-burst-lora-adapters", "bursts"),
@@ -204,7 +207,12 @@ SPEAKER_LORA_LAM = float(os.environ.get("MOSS_SPEAKER_LORA_LAM", "1.0"))
 # Aesthetics adapter, off by default: it is a quality/polish dimension rather
 # than a per-moment acting choice, so it gets its own dial instead of being
 # something the director picks.
-AESTH_LORA = os.environ.get("MOSS_AESTH_LORA", "voicenet:vn_ESTH__high")
+# Retired.  It pointed at the parked 57-dimension VoiceNet set, so the slider
+# bound to it could not load anything — while the real aesthetics adapter
+# (sft3_quality:esthetics_high) was running at its own weight elsewhere, which
+# made a UI reading "0.00" actively misleading.  The slider now drives the
+# quality adapter directly; set this to an adapter name to bring the dial back.
+AESTH_LORA = os.environ.get("MOSS_AESTH_LORA", "")
 # Off by default on SFT3: it was trained against the untuned v2 weights, so on
 # this checkpoint it is off-distribution, and at 1.1 it was the strongest
 # such adapter in the stack.  The slider still turns it back on.
@@ -414,7 +422,12 @@ CODE_CACHE = os.environ.get("MOSS_CODE_CACHE",
 # only costs headroom.  Here the number is an instruction the checkpoint obeys,
 # and 6 frames a word drags: the format's own worked example runs 13 words in
 # 4.7 s, which is 4.5 frames a word.
-TIMED_FRAMES_PER_WORD = float(os.environ.get("MOSS_TIMED_FPW", "4.5"))
+# 4.5 is the rate of the format's own worked example, and it leaves this voice
+# slack: the model hits the requested duration to within 0.02 s whatever else
+# changes, so any budget it does not need to speak the line, it fills.  4.0 with
+# no closing pause invented words in 0-10% of takes across three seeds, against
+# 20-40% at 4.5 with one.
+TIMED_FRAMES_PER_WORD = float(os.environ.get("MOSS_TIMED_FPW", "4.0"))
 # The SFT3 timed script: durations, pauses and burst lengths that add up to the
 # Tokens budget, with the script repeated byte-identically into the Text field.
 TIMED_SCRIPT = os.environ.get("MOSS_TIMED_SCRIPT", "1") not in ("0", "false", "")

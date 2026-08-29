@@ -22,7 +22,7 @@ environment variable too, so nothing here needs a code edit to change.
 | setting | value |
 |---|---|
 | `USE_LORA` | `True` |
-| `LORA_ROOTS` | `{'emotion': '/home/c4r33u19/.cache/huggingface/hub/models--TTS-AGI--moss-emotion-loras-v3/snapshots/6fb7de6247c833ef4e1686f7932432374d27218a/', 'character': '/home/c4r33u19/.cache/huggingface/hub/models--TTS-AGI--moss-character-loras-refined-public/snapshots/6f794348824f0c26cc87a2ae5c9ef828393b9b22/ …` |
+| `LORA_ROOTS` | `{'character': '/home/c4r33u19/.cache/huggingface/hub/models--TTS-AGI--moss-character-loras-refined-public/snapshots/6f794348824f0c26cc87a2ae5c9ef828393b9b22/', 'burst': '/mnt/nvme/moss-15-v2-assets/loras/sft3_burst', 'sft3_voicenet': '/mnt/nvme/moss-15-v2-assets/loras/sft3_voicenet', 'sft3_quality': …` |
 | `PROFILE_LORA_KIND` | `sft3_voice` |
 | `SFT3_DPO_LORA` | `sft3_dpo:p2` |
 | `SFT3_DPO_LAM` | `1.0` |
@@ -31,7 +31,7 @@ environment variable too, so nothing here needs a code edit to change.
 | `PROFILE_LORA_LAM` | `0.25` |
 | `PURE_PROFILE_LAM` | `0.5` |
 | `BASE_STYLE_LORAS` | `()` |
-| `AESTH_LORA` | `voicenet:vn_ESTH__high` |
+| `AESTH_LORA` | `` |
 | `AESTH_LORA_LAM` | `0.0` |
 | `SPEAKER_LORA` | `speaker:velvet-sage-baritone` |
 | `SPEAKER_LORA_LAM` | `1.0` |
@@ -56,7 +56,7 @@ environment variable too, so nothing here needs a code edit to change.
 | setting | value |
 |---|---|
 | `TIMED_SCRIPT` | `True` |
-| `TIMED_FRAMES_PER_WORD` | `4.5` |
+| `TIMED_FRAMES_PER_WORD` | `4.0` |
 | `FRAME_RATE` | `12.5` |
 | `SPLIT_MIN_WORDS` | `100000` |
 | `BASE_REGISTER` | `spoken softly and naturally at close conversational volume, relaxed and unforced, the way someone actually talks to one person in a quiet room rather than performing to a room full of them.` |
@@ -96,7 +96,7 @@ environment variable too, so nothing here needs a code edit to change.
 | `BURST_LAM_INTENSE` | `0.5` |
 | `CONTINUITY` | `the same speaker continues without interruption: identical voice, identical person, same microphone and same room.` |
 | `EIV_DIR` | `/mnt/nvme/empathic-insights-voice-small` |
-| `EMOTION_NAMES` | `{'Triumph', 'Astonishment_Surprise', 'Distress', 'Malevolence_Malice', 'Anger', 'Concentration', 'Emotional_Numbness', 'Contempt', 'Contentment', 'Sexual_Lust', 'Fear', 'Disappointment', 'Doubt', 'Bit …` |
+| `EMOTION_NAMES` | `{'Distress', 'Helplessness', 'Fatigue_Exhaustion', 'Impatience_and_Irritability', 'Hope_Enthusiasm_Optimism', 'Infatuation', 'Intoxication_Altered_States_of_Consciousness', 'Pleasure_Ecstasy', 'Sexual …` |
 | `HISTORY_TURNS_LOCAL` | `8` |
 | `HISTORY_TURNS_LUNA` | `40` |
 | `LLM_BASE` | `http://127.0.0.1:8790` |
