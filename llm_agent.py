@@ -94,13 +94,15 @@ its cues removed, so "script" must contain the complete line, exactly as you wan
      S_RANT_high to rant, S_DRAM_high for drama, S_ASMR_high to go small and hesitant, VOLT_high for
      an unsteady, slurred, heavy-breathing delivery, TENS_high for held tension, VULN_high when the
      feeling leaks through and cannot be hidden, AROU_low to dial everything down. Each carries a
-     "strength": 0.25 for a touch, 0.5 to make it clearly audible, 0.75 when it should dominate.
+     "strength": 0.5 is a touch, 1.0 is clearly there, 1.5 is the strongest and still safe.
      Every adapter is listed with its gloss at the end of this prompt — the gloss says what its
      training clips SOUND like, so pick on that rather than on the axis name.
-     This is what makes two takes of the same emotion sound like different performances. Use it
-     when the manner matters, and leave the array empty when it does not — an adapter that fights
-     the emotion is worse than none, and these sixteen are a pilot set that has not been evaluated,
-     so keep the strengths modest unless the moment really calls for more.
+     REACH FOR ONE OF THESE BEFORE PUSHING AN EMOTION HARDER. Measured on this checkpoint, the
+     delivery axes move the voice 18-20x further than the emotion adapters do, and they cost
+     almost nothing in intelligibility across their whole range. If a moment is not landing, a
+     delivery axis is the lever that works; a stronger emotion mostly is not.
+     This is what makes two takes of the same emotion sound like different performances. Leave the
+     array empty when no axis fits — an adapter that fights the emotion is worse than none.
    - The full bank is listed at the end of this prompt. USE ITS RANGE. Pick the condition that
      actually fits this moment, not the first plausible one — there are forty emotions and each
      comes in four shades, so "Disappointment moderate contained" and "Bitterness intense

@@ -96,7 +96,7 @@ environment variable too, so nothing here needs a code edit to change.
 | `BURST_LAM_INTENSE` | `0.5` |
 | `CONTINUITY` | `the same speaker continues without interruption: identical voice, identical person, same microphone and same room.` |
 | `EIV_DIR` | `/mnt/nvme/empathic-insights-voice-small` |
-| `EMOTION_NAMES` | `{'Concentration', 'Anger', 'Distress', 'Impatience_and_Irritability', 'Awe', 'Fatigue_Exhaustion', 'Doubt', 'Emotional_Numbness', 'Disgust', 'Pleasure_Ecstasy', 'Pride', 'Elation', 'Triumph', 'Disappo …` |
+| `EMOTION_NAMES` | `{'Shame', 'Elation', 'Disappointment', 'Sexual_Lust', 'Sourness', 'Intoxication_Altered_States_of_Consciousness', 'Relief', 'Affection', 'Anger', 'Thankfulness_Gratitude', 'Pain', 'Sadness', 'Disgust' …` |
 | `HISTORY_TURNS_LOCAL` | `8` |
 | `HISTORY_TURNS_LUNA` | `40` |
 | `LLM_BASE` | `http://127.0.0.1:8790` |
@@ -105,13 +105,14 @@ environment variable too, so nothing here needs a code edit to change.
 | `LUNA_MODEL` | `gpt-5.6-luna` |
 | `MAX_SESSIONS` | `200` |
 | `MEANVC2_ROOT` | `/mnt/nvme/moss-15-v2-assets/MeanVC2` |
+| `QUALITY_CONFLICTS` | `{'sft3_quality:esthetics_high': {'S_RANT_high': 0.0, 'S_DRAM_high': 0.5}}` |
 | `QUALITY_LABELS` | `{'sft3_quality:genuineness_high': 'Genuineness', 'sft3_quality:blend_high': 'Burst blend', 'sft3_quality:esthetics_high': 'Aesthetics'}` |
 | `QUALITY_LORAS` | `{'sft3_quality:genuineness_high': 0.25, 'sft3_quality:blend_high': 0.5, 'sft3_quality:esthetics_high': 0.5}` |
 | `SCORE_ATTRS` | `('Arousal', 'Valence', 'Authenticity', 'Confident_vs._Hesitant')` |
 | `SCORE_DEVICE` | `cuda:1` |
 | `SFT3` | `True` |
 | `SFT3_VN_ADAPTERS` | `{'AROU_high': 'highly aroused, very dominant, tense, elated, thin', 'AROU_low': 'dialled down, not performed at full size; narrow pitch range, submissive, slow', 'ARSH_high': 'energised, slightly domi …` |
-| `SFT3_VN_LEVELS` | `(0.25, 0.5, 0.75)` |
+| `SFT3_VN_LEVELS` | `(0.5, 0.75, 1.0, 1.25, 1.5)` |
 | `SFT3_VN_MAX` | `1` |
 | `SIDON_CKPTS` | `/mnt/nvme/moss-15-v2-assets/sidon-ckpts` |
 | `SIDON_GPU` | `0` |

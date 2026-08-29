@@ -132,6 +132,11 @@ needs to land emotionally, reach for a delivery axis (`S_DRAM`, `S_WHIS`,
 
 ### Consider a different ASR for the harness
 
+> **Note added when merging (demo side):** this server and its harness were
+> already on `nvidia/parakeet-tdt-0.6b-v3` before this PR — `config.ASR_MODEL`
+> and `eval_tail.ASR` both read it. There is no Whisper in this stack and no
+> Whisper thresholds to keep. The advice below is right; it was already taken.
+
 `LEARNINGS.md` records that ten samples at one seed is not a result, which is
 true. Part of that variance is the ruler: on identical audio, Whisper
 large-v3-turbo is **2.4× noisier** than `nvidia/parakeet-tdt-0.6b-v3`. Switching
@@ -170,6 +175,24 @@ remaining modules is audible. Generating the same line at turn 1 and turn 24 of 
 session and comparing would answer it.
 
 ---
+
+## Smoke test on merge (demo side, 29 August 2026)
+
+Run before merging, as asked:
+
+* **Tie detection works and finds more than the regex did.** `_tied_paths()`
+  reports **26 modules in 13 groups**: the twelve `audio_lm_heads.N` /
+  `audio_embeddings.N` pairs the regex already knew about, plus
+  `transformer.embed_tokens` / `text_lm_head` — exactly the latent tie predicted
+  above. Confirmed independently against a freshly loaded checkpoint.
+* **Still latent.** None of `sft3_dpo:p2`, `sft3_quality:*`, `sft3_voicenet:*`,
+  `sft3_emotion:*` or `sft3_voice:*` carries LoRA on `text_lm_head` or
+  `embed_tokens` — all 268 of their target modules are elsewhere. So this is a
+  guard against a future checkpoint, not a live bug that was being hit.
+* **The interference rule fires correctly.** Forcing `S_RANT_high` at 1.5
+  dropped `sft3_quality:esthetics_high` from 0.5 to 0 with the intended log
+  line, and the adapter is absent from the applied set.
+* **A full turn generates normally** under the merged code.
 
 Everything cited here is in `LAION-AI/Voice-Acting-Pipeline-WIP`,
 `research-log-2026-08/` — `lora-dose/` for the dose-response sweep,
