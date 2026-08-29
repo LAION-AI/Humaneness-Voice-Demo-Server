@@ -216,6 +216,41 @@ class LoraBank:
     # not 536, and correctness is not optional.
     TIED = re.compile(r"(?:^|\.)audio_(?:lm_heads|embeddings)\.\d+$")
 
+    def _tied_paths(self):
+        """Every module whose weight tensor is SHARED with another module.
+
+        The regex above is right for the twelve audio heads, but it is a list of
+        names that has to be kept in step with the checkpoint by hand, and it
+        misses the other tie the same model makes:
+
+            self.text_lm_head.weight = self.transformer.embed_tokens.weight
+
+        Nothing in this stack currently adapts `text_lm_head`, so that one is
+        latent rather than live — but "latent" is what the audio-head tie was
+        until an adapter set started targeting it, and a hand-maintained list
+        cannot notice a new tie appearing in a future checkpoint.
+
+        Asking the model is cheaper than remembering.  Two parameters are the
+        same tensor exactly when they share storage, so group every weight by
+        `data_ptr()` and take any group with more than one owner.  Computed once
+        and cached; a few hundred pointer reads.
+        """
+        if getattr(self, "_tied_cache", None) is not None:
+            return self._tied_cache
+        by_ptr = {}
+        for mp, m in self._module_map().items():
+            w = getattr(m, "weight", None)
+            if w is None or not hasattr(w, "data_ptr"):
+                continue
+            by_ptr.setdefault((w.data_ptr(), w.device), []).append(mp)
+        tied = {mp for owners in by_ptr.values() if len(owners) > 1 for mp in owners}
+        self._tied_cache = tied
+        if tied:
+            print(f"[lora] {len(tied)} modules share weights and will never be "
+                  f"merged: {', '.join(sorted(tied)[:4])}"
+                  f"{' …' if len(tied) > 4 else ''}", flush=True)
+        return tied
+
     def _snapshot(self, paths):
         if not hasattr(self, "_pristine"):
             self._pristine = {}
@@ -247,8 +282,20 @@ class LoraBank:
                 touched.setdefault(mp, []).append((A, B, s * float(lam)))
             applied.append((name, float(lam)))
         # tied weights cannot be merged; they are hooked instead
-        hooked = {mp: t for mp, t in touched.items() if self.TIED.search(mp)}
+        # A module is hooked rather than merged if EITHER the name matches the
+        # known-tied pattern OR the model itself reports the weight as shared.
+        # The union is deliberate: the regex documents intent, the storage check
+        # catches whatever the regex has not been told about yet.
+        tied = self._tied_paths()
+        hooked = {mp: t for mp, t in touched.items()
+                  if self.TIED.search(mp) or mp in tied}
         touched = {mp: t for mp, t in touched.items() if mp not in hooked}
+        # Belt and braces.  If a shared weight ever reaches the merge path the
+        # damage is silent -- the model keeps generating, slightly wrong, and
+        # nothing in the logs says so.  Fail loudly instead.
+        assert not (set(touched) & tied), (
+            "refusing to merge into shared weights: "
+            f"{sorted(set(touched) & tied)}")
         if hooked:
             if not getattr(self, "_said_hooked", False):
                 self._said_hooked = True
