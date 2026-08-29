@@ -289,7 +289,12 @@ MIN_FRAME_FRACTION = float(os.environ.get("MOSS_MIN_FRAME_FRACTION", "0.55"))
 # above it nothing is changed — so a take that runs past the floor and then stops
 # a few words early is untouched by it.  A gentle constant bias leans against
 # stopping everywhere instead, without ever forbidding it.
-STOP_BIAS = float(os.environ.get("MOSS_STOP_BIAS", "3.0"))
+# Measured on the current prompt shape, three seeds of ten utterances each:
+# 1.0, 2.0 and 3.0 give bit-identical output (word error 0.030, no invented
+# words in any take), 0.0 is marginally worse and 4.0 brings invented words back
+# in 7% of takes.  2.0 is the middle of that plateau.  The dial matters far less
+# than the duration budget does — see docs/EXPERIMENTS.md, experiments 7 and 8.
+STOP_BIAS = float(os.environ.get("MOSS_STOP_BIAS", "2.0"))
 
 FRAME_RATE = 12.5          # RVQ frames per second
 HOLDBACK_S = 0.08

@@ -457,6 +457,11 @@ speaker similarity. The headline: **SFT3 + DPO-p2 alone is clean — word error
 0.013 and not one invented word in ten takes** — and every further adapter
 degrades that, monotonically in both count and weight.
 
+If you are new to the project, start with
+[`docs/LEARNINGS.md`](docs/LEARNINGS.md) — a plain-language account of the
+trailing-speech bug, how it was chased, which suspicions were wrong, and what
+finally fixed it.
+
 See [`docs/EXPERIMENTS.md`](docs/EXPERIMENTS.md) for the method, all prompts, all
 hyper-parameters and the full tables, and `eval/results/` for the raw per-take
 data including every transcript.

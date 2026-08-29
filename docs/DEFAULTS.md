@@ -66,7 +66,7 @@ environment variable too, so nothing here needs a code edit to change.
 | setting | value |
 |---|---|
 | `DEFAULTS` | `{'language': 'English', 'audio_temperature': 1.0, 'audio_top_p': 0.95, 'audio_top_k': 25, 'audio_repetition_penalty': 1.1, 'text_temperature': 1.0, 'text_top_p': 1.0, 'text_top_k': 50, 'max_new_tokens': 0, 'chunk_frames': 12, 'stop_bias': None, 'seed': 0}` |
-| `STOP_BIAS` | `3.0` |
+| `STOP_BIAS` | `2.0` |
 | `MIN_FRAME_FRACTION` | `0.55` |
 | `HOLDBACK_S` | `0.08` |
 | `CROSSFADE_S` | `0.06` |
@@ -96,7 +96,7 @@ environment variable too, so nothing here needs a code edit to change.
 | `BURST_LAM_INTENSE` | `0.5` |
 | `CONTINUITY` | `the same speaker continues without interruption: identical voice, identical person, same microphone and same room.` |
 | `EIV_DIR` | `/mnt/nvme/empathic-insights-voice-small` |
-| `EMOTION_NAMES` | `{'Distress', 'Helplessness', 'Fatigue_Exhaustion', 'Impatience_and_Irritability', 'Hope_Enthusiasm_Optimism', 'Infatuation', 'Intoxication_Altered_States_of_Consciousness', 'Pleasure_Ecstasy', 'Sexual …` |
+| `EMOTION_NAMES` | `{'Concentration', 'Anger', 'Distress', 'Impatience_and_Irritability', 'Awe', 'Fatigue_Exhaustion', 'Doubt', 'Emotional_Numbness', 'Disgust', 'Pleasure_Ecstasy', 'Pride', 'Elation', 'Triumph', 'Disappo …` |
 | `HISTORY_TURNS_LOCAL` | `8` |
 | `HISTORY_TURNS_LUNA` | `40` |
 | `LLM_BASE` | `http://127.0.0.1:8790` |

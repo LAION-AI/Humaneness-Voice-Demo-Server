@@ -197,8 +197,8 @@ def main():
         stack = [(G, 0.25), (B, 0.5), (E, 0.5),
                  ("sft3_voice:emolia_c1699", 0.25),
                  ("sft3_emotion:Amusement", 1.0)]
-        todo = [(f"stop_bias {sb:+.1f}", stack) for sb in
-                (-3.0, -2.0, -1.0, -0.5, 0.0, 1.0, 3.0, 4.0)]
+        todo = [(f"seed {sd} stop_bias {sb:+.1f}", stack)
+                for sb in (0.0, 1.0, 2.0, 3.0, 4.0) for sd in (1234, 777, 42)]
     elif a.set == "combo":
         # built from the single-adapter results: genuineness is only safe low,
         # blend is safe anywhere, esthetics costs genuineness, voice buys
@@ -249,10 +249,12 @@ def main():
         if cond in done:
             continue
         try:
-            sb = None
+            sb = sd = None
             if a.set == "stopbias":
-                sb = float(cond.split()[-1])
-            rec = run(cond, [(DPO, 1.0)] + extra, items, refs, asr, sc, stop_bias=sb)
+                parts = cond.split()
+                sd, sb = int(parts[1]), float(parts[-1])
+            rec = run(cond, [(DPO, 1.0)] + extra, items, refs, asr, sc,
+                      seed=sd if sd is not None else a.seed, stop_bias=sb)
         except Exception as e:
             print(f"  {cond}: {str(e)[:140]}", flush=True)
             continue
