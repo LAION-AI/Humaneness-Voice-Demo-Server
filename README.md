@@ -484,6 +484,11 @@ table is what `auto` reads to pick a per-attribute operating point. With nothing
 installed, `auto` asks for no lever and the server behaves exactly as it did
 before; every degrade is reported in `/api/state` and in the response payload.
 
+The two assets are published as [release
+assets](https://github.com/LAION-AI/Humaneness-Voice-Demo-Server/releases/tag/assets-2026-08-29)
+on this repository — `curl` lines and checksums in
+[`docs/LEVERS.md` §8](docs/LEVERS.md).
+
 > The evidence for each of those defaults, what the modes cost, why guidance is
 > rendered rather than streamed, and where the assets come from, are in
 > [`docs/LEVERS.md`](docs/LEVERS.md).

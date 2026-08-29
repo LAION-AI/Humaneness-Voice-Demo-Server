@@ -249,16 +249,36 @@ emotion; and spend guidance only when the first two have not reached the band.
 
 ## 8. Where the assets come from
 
-Two files are needed, and **neither is in this repository**.
+Two files, neither of them in git history. Both are published as **release assets on this
+repository**, which is public, so no token is needed:
 
-| file | size | what it is |
-|---|--:|---|
-| `p3_vectors_server.npz` | **5.3 MB** | 99 attributes × their own top 5 layers × 2560, float32 |
-| `coefficients.json` | ~0.4 MB | the measured operating point for each of 60 attributes |
+```bash
+B=https://github.com/LAION-AI/Humaneness-Voice-Demo-Server/releases/download/assets-2026-08-29
+
+curl -fL -o /mnt/nvme/moss-15-v2-assets/wikiskills/coefficients.json --create-dirs \
+  $B/coefficients.json
+curl -fL -o /mnt/nvme/moss-15-v2-assets/steering/p3_vectors_server.npz --create-dirs \
+  $B/p3_vectors_server.npz
+```
+
+Those are the paths `config.WIKI_COEFFICIENTS` and `config.STEER_PACK` already default to.
+Keep the `-f`: without it curl writes an HTTP error page to the target path and the failure
+surfaces later as a puzzling parse error. Check the hashes, then run
+`python setup/check_levers.py`.
+
+| file | bytes | sha256 | what it is |
+|---|--:|---|---|
+| `coefficients.json` | 324,511 | `7e029f0e…13e840` | the measured operating point for each of 60 attributes |
+| `p3_vectors_server.npz` | 5,334,470 | `d81b6971…6de78f7` | 99 attributes × their own top 5 layers × 2560, float32 |
+
+> The research log `LAION-AI/Voice-Acting-Pipeline-WIP` is **private**, so a `raw`
+> `githubusercontent` link into it returns 404 for anyone outside it. That is why these are
+> mirrored here rather than linked there.
 
 The research library the vectors are distilled from is **112 MB** — three difference tables
 of 99 × 38 × 2560 — and none of it belongs in git. `setup/build_steering_pack.py` reduces it
-to the one table and the few layers the server can actually reach:
+to the one table and the few layers the server can actually reach, on a machine that has the
+research artefacts (they are not on the demo box):
 
 ```bash
 python setup/build_steering_pack.py \
