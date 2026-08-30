@@ -621,7 +621,18 @@ NUMBNESS_SUBTRACTION = os.environ.get("MOSS_NUMBNESS", "with_steer")
 # value.  Below 1 guidance actively hurts (-0.0370 at g = 0.5, t -2.56).
 CFG_G = {"emo": 3.0, "vn": 2.5, "qual": 2.5}
 CFG_G_MIN = float(os.environ.get("MOSS_CFG_G_MIN", "1.5"))
-CFG_G_MAX = float(os.environ.get("MOSS_CFG_G_MAX", "3.0"))
+# Raised 3.0 -> 4.0 on the field report in docs/FIELD_NOTES.md: "CFG seems fine up to about
+# 4.0.  Above that it degenerates."  That is one listener rather than n = 30, and it is still
+# the only evidence anyone has about how guidance SOUNDS -- the CFG study picked the family
+# defaults by word error rate and never ran a listening test.  It is enough to move a ceiling,
+# because the old 3.0 was not a measured limit either: it was the largest family default,
+# reused as a bound.  The consequence of leaving it was concrete -- the strength dial offers
+# 1-5, but the clamp below meant a director asking for 4 silently got 3, so the one range the
+# field report calls good was unreachable through the automatic path.
+# The family DEFAULTS in CFG_G are deliberately unchanged: the report says the current
+# settings are good and that 4.0 is the top of the usable range, not that the defaults are
+# too low.
+CFG_G_MAX = float(os.environ.get("MOSS_CFG_G_MAX", "4.0"))
 # Measured at batch 1: 1.89-1.94x over four cells, sd 0.053.  The intuition that only the
 # semantic transformer doubles is wrong -- the local transformer doubles too, running twelve
 # times per frame per branch, and the codec decode, the only genuinely shared component, is

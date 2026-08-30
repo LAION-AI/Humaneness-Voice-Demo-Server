@@ -252,7 +252,7 @@
       <input type="checkbox" id="cfgsweep"> CFG-Sweep <i>(mehrere Faktoren)</i></label>
     <label title="Komma-getrennte CFG-Faktoren fuer den Sweep.">
       Sweep-Werte
-      <input id="cfgvals" type="text" value="1.0, 1.5, 2.0, 3.0"
+      <input id="cfgvals" type="text" value="1.0, 2.0, 3.0, 4.0"
              style="width:110px;background:var(--panel2);border:1px solid var(--line);
                     color:var(--fg);border-radius:6px;padding:2px 6px;font:12px var(--mono)"></label>
     <label title="Charakter-Adapter dieser Stimme dazu. Trainiert gegen die ungetunten v2-Gewichte, auf dem SFT+DPO-Checkpoint also off-distribution.">
@@ -354,6 +354,12 @@ function attachPlayer(node, chunks, sr, secs, label){
 // Same script, same adapters, same seed, one number different.  Nothing plays by
 // itself: the whole point is to click between the versions and hear where the
 // guidance starts costing more than it buys.
+// The default row spans the usable range: 1.0 is the control (g = 1 cancels the
+// unconditional term exactly and IS ordinary sampling), and 4.0 is the top of what
+// the field report in docs/FIELD_NOTES.md found still sounds right.  It used to stop
+// at 3.0, which meant the sweep never showed the one value the report singles out.
+// Type 5.0 in yourself to hear the degeneration -- that is why the box is free text
+// and the slider is not clamped.
 async function runSweep(){
   const t = window._lastTurn;
   if(!t || !t.script){ addMsg('bot','⚠ Erst eine Antwort erzeugen, dann sweepen.'); return; }
