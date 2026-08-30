@@ -547,7 +547,15 @@ BURST_LAM_INTENSE = float(os.environ.get("MOSS_BURST_LAM_INTENSE", "0.5"))
 # Default is `auto`, which resolves per family from the measurements: emotion ->
 # adapter+steer, delivery -> adapter, quality -> adapter.  `auto` never spends guidance.
 # Source: research-log-2026-08/combination-study/ in LAION-AI/Voice-Acting-Pipeline-WIP.
-GEN_MODE = os.environ.get("MOSS_GEN_MODE", "auto")
+# Rolled back to `adapter` after a listening report: with `auto` the demo picked
+# steering on nearly every turn (alpha +0.10 on the target attribute and -0.10 on
+# Emotional_Numbness), and a human heard it as artefacts and an off timbre even
+# though the scoring models liked it.  That is the documented blind spot of this
+# evidence — the steering study states plainly that no listening test was run on
+# any of its results, and every figure in it is one model judging another model's
+# output.  `auto` and the rest stay one environment variable away:
+#     MOSS_GEN_MODE=auto|adapter+steer|adapter+cfg|steer|cfg
+GEN_MODE = os.environ.get("MOSS_GEN_MODE", "adapter")
 # Both levers are individually killable, and with either off the modes that need it degrade
 # to `adapter` and say so in the response payload rather than reporting a mode that is not
 # running (docs/LEARNINGS.md: a dial that reads a value while the thing it names is off is

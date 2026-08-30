@@ -72,39 +72,6 @@ environment variable too, so nothing here needs a code edit to change.
 | `CROSSFADE_S` | `0.06` |
 | `CTX_FRAMES` | `160` |
 
-## Generation modes
-
-Three levers exist, not one: the adapter merge weight this server always had, a steering
-vector added to the hidden state, and classifier-free guidance. The write-up and the
-evidence for every default here are in [`LEVERS.md`](LEVERS.md).
-
-| setting | value | why |
-|---|---|---|
-| `GEN_MODE` | `auto` | which levers run; `auto` resolves per family from the measurements |
-| `STEER_ENABLED` | `True` | steering off entirely when false |
-| `CFG_ENABLED` | `True` | guidance off entirely when false |
-| `AGENT_PICKS_MODE` | `True` | may the director choose the mode, or does `GEN_MODE` decide |
-| `DELIVERY_LEVER` | `adapter` | on a delivery axis the adapter and the steering vector are sub-additive (-0.164, t -3.7); this picks which one runs |
-| `STEER_PACK` | `/mnt/nvme/moss-15-v2-assets/steering/p3_vectors_server.npz` | the 5.3 MB distilled vector pack; **not in this repository**, see docs/LEVERS.md |
-| `STEER_TAP_RANK` | `/mnt/nvme/moss-15-v2-assets/steering/tap_rank.json` | only needed when `STEER_PACK` points at the raw 112 MB research file |
-| `STEER_PACK_K` | `5` | layers kept per attribute; 5 covers every shipped k |
-| `WIKI_COEFFICIENTS` | `/mnt/nvme/moss-15-v2-assets/wikiskills/coefficients.json` | the measured operating point per attribute; absent, the levers are refused rather than guessed |
-| `STEER_ALPHA` | `0.1` | the free setting: emotion percentile 0.4354 -> 0.5840 with word error falling |
-| `STEER_ALPHA_CEILING` | `0.15` | per component; half the 0.3 at which steering collapses |
-| `STEER_REALISED_CEILING` | `0.25` | per layer after components sum; the measured recipes reach 0.1926 |
-| `STEER_K` | `{'emo': 1, 'vn': 3, 'qual': 0}` | layers per attribute: emotion is free only at 1, quality breaks at 2, delivery wants 3-5 |
-| `STRENGTH_ALPHA_SCALE` | `{'gentle': 0.5, 'moderate': 1.0, 'strong': 1.0}` | the director's three words; it never sends a number |
-| `NUMBNESS_SUBTRACTION` | `with_steer` | `with_steer` attaches -0.10 of Emotional_Numbness to a steered emotion: +0.60 genuineness (t 9.64) at no cost in emotion |
-| `CFG_G` | `{'emo': 3.0, 'vn': 2.5, 'qual': 2.5}` | g = 3.0 for emotion, 2.5 for delivery, at word error <= 0.20 |
-| `CFG_G_MIN` | `1.5` | below g = 1 guidance actively hurts (-0.0370 at 0.5, t -2.56) |
-| `CFG_G_MAX` | `3.0` | the top of the measured ladder |
-| `CFG_COST_FACTOR` | `1.93` | measured at batch 1, 1.89-1.94 over four cells; this is why guidance does not stream |
-| `CFG_STEER_BRANCH` | `both` | steering both branches keeps 82 % of the effect and returns 0.209 of word error and 0.75 of genuineness |
-| `QUALITY_AXES` | `('genuineness_high', 'blend_high', 'esthetics_high')` | the three perceptual axes, by the name the director uses |
-
-With no `STEER_PACK` and no `WIKI_COEFFICIENTS` on disk the server behaves exactly as it
-did before generation modes existed: every mode that needs them degrades to `adapter`,
-and `/api/state` and the response payload both say so.
 ## Profiles & caches
 
 | setting | value |
@@ -122,14 +89,23 @@ and `/api/state` and the response payload both say so.
 
 | setting | value |
 |---|---|
+| `AGENT_PICKS_MODE` | `True` |
 | `APP_PORT` | `8792` |
 | `ASR_DEVICE` | `cuda:1` |
 | `ASSETS` | `/mnt/nvme/moss-15-v2-assets/loras` |
 | `BURST_LAM` | `0.25` |
 | `BURST_LAM_INTENSE` | `0.5` |
+| `CFG_COST_FACTOR` | `1.93` |
+| `CFG_ENABLED` | `True` |
+| `CFG_G` | `{'emo': 3.0, 'vn': 2.5, 'qual': 2.5}` |
+| `CFG_G_MAX` | `3.0` |
+| `CFG_G_MIN` | `1.5` |
+| `CFG_STEER_BRANCH` | `both` |
 | `CONTINUITY` | `the same speaker continues without interruption: identical voice, identical person, same microphone and same room.` |
+| `DELIVERY_LEVER` | `adapter` |
 | `EIV_DIR` | `/mnt/nvme/empathic-insights-voice-small` |
-| `EMOTION_NAMES` | `{'Shame', 'Elation', 'Disappointment', 'Sexual_Lust', 'Sourness', 'Intoxication_Altered_States_of_Consciousness', 'Relief', 'Affection', 'Anger', 'Thankfulness_Gratitude', 'Pain', 'Sadness', 'Disgust' …` |
+| `EMOTION_NAMES` | `{'Emotional_Numbness', 'Confusion', 'Disappointment', 'Fatigue_Exhaustion', 'Infatuation', 'Impatience_and_Irritability', 'Astonishment_Surprise', 'Disgust', 'Distress', 'Awe', 'Pain', 'Embarrassment' …` |
+| `GEN_MODE` | `adapter` |
 | `HISTORY_TURNS_LOCAL` | `8` |
 | `HISTORY_TURNS_LUNA` | `40` |
 | `LLM_BASE` | `http://127.0.0.1:8790` |
@@ -138,6 +114,8 @@ and `/api/state` and the response payload both say so.
 | `LUNA_MODEL` | `gpt-5.6-luna` |
 | `MAX_SESSIONS` | `200` |
 | `MEANVC2_ROOT` | `/mnt/nvme/moss-15-v2-assets/MeanVC2` |
+| `NUMBNESS_SUBTRACTION` | `with_steer` |
+| `QUALITY_AXES` | `('genuineness_high', 'blend_high', 'esthetics_high')` |
 | `QUALITY_CONFLICTS` | `{'sft3_quality:esthetics_high': {'S_RANT_high': 0.0, 'S_DRAM_high': 0.5}}` |
 | `QUALITY_LABELS` | `{'sft3_quality:genuineness_high': 'Genuineness', 'sft3_quality:blend_high': 'Burst blend', 'sft3_quality:esthetics_high': 'Aesthetics'}` |
 | `QUALITY_LORAS` | `{'sft3_quality:genuineness_high': 0.25, 'sft3_quality:blend_high': 0.5, 'sft3_quality:esthetics_high': 0.5}` |
@@ -154,6 +132,15 @@ and `/api/state` and the response payload both say so.
 | `SPEAKER_IDENTITY` | `the voice of one man in his early fifties. a warm, unhurried baritone that sits low and forward in the chest, like aged oak and morning mist. the timbre is dark and resonant with a soft gravel at the  …` |
 | `SPEEDS` | `(0.5, 0.75, 1.0, 1.25, 1.5)` |
 | `SPEED_WORDS` | `{'much_slower': 0.5, 'slower': 0.75, 'normal': 1.0, 'faster': 1.25, 'much_faster': 1.5}` |
+| `STEER_ALPHA` | `0.1` |
+| `STEER_ALPHA_CEILING` | `0.15` |
+| `STEER_ENABLED` | `True` |
+| `STEER_K` | `{'emo': 1, 'vn': 3, 'qual': 0}` |
+| `STEER_PACK` | `/mnt/nvme/moss-15-v2-assets/steering/p3_vectors_server.npz` |
+| `STEER_PACK_K` | `5` |
+| `STEER_REALISED_CEILING` | `0.25` |
+| `STEER_TAP_RANK` | `/mnt/nvme/moss-15-v2-assets/steering/tap_rank.json` |
+| `STRENGTH_ALPHA_SCALE` | `{'gentle': 0.5, 'moderate': 1.0, 'strong': 1.0}` |
 | `TAIL_FRAMES` | `50` |
 | `TAIL_TURNS` | `2` |
 | `USE_ANCHOR` | `True` |
@@ -164,4 +151,5 @@ and `/api/state` and the response payload both say so.
 | `VN_BASELINE` | `/mnt/nvme/moss-15-v2-assets/vn_baseline.json` |
 | `VN_DIR` | `/mnt/nvme/moss-15-v2-assets/voicenet-pred` |
 | `WHISPER_DIR` | `/mnt/nvme/moss-15-v2-assets/bude-whisper` |
+| `WIKI_COEFFICIENTS` | `/mnt/nvme/moss-15-v2-assets/wikiskills/coefficients.json` |
 | `_OLD_BASE_STYLE_LORAS` | `(('voicenet:vn_S_CONV__high', 0.25), ('voicenet:vn_S_CASU__high', 0.5), ('voicenet:vn_WARM__high', 0.25))` |

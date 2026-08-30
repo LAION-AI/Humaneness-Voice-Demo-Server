@@ -512,6 +512,23 @@ See [`docs/EXPERIMENTS.md`](docs/EXPERIMENTS.md) for the method, all prompts, al
 hyper-parameters and the full tables, and `eval/results/` for the raw per-take
 data including every transcript.
 
+## Generation modes
+
+Beyond adapters and the prompt, two further levers are implemented — **steering**
+(injecting a measured direction into the hidden state) and **guidance**
+(classifier-free guidance against a neutralised prompt). Both are wired, tested
+and documented in [`docs/LEVERS.md`](docs/LEVERS.md).
+
+**`GEN_MODE` defaults to `adapter`: neither is on.** They were switched off after
+a listening report — with the automatic resolver the output measured better and
+*sounded* worse, with artefacts and an off timbre. Every number behind those
+levers is one model scoring another model's output, and no listening test has
+been run on any of it. They are one environment variable away:
+
+```
+MOSS_GEN_MODE=auto|adapter|adapter+steer|adapter+cfg|steer|cfg
+```
+
 ## Known limits
 
 * Emotion retrieval is right about 61 % of the time over 40 classes. A wrong pick

@@ -411,3 +411,47 @@ the coefficient table records.
 * **Ten prompts per cell.** The family-level rows above pool hundreds of cells and are solid;
   a single attribute's row is ten prompts and is not.
 * **English and German only**, and almost everything measured so far is English.
+
+## What this server actually ships, and why it is not `auto`
+
+**`GEN_MODE` defaults to `adapter`.** Clone this repository, install the assets, run it, and
+you get adapters and a prompt — no steering, no guidance. Everything below still works and is
+one environment variable away:
+
+```
+MOSS_GEN_MODE=auto|adapter|adapter+steer|adapter+cfg|steer|cfg
+```
+
+The reason is a listening report, and it is worth recording in full because it is the kind of
+result the rest of this document cannot produce.
+
+Running with `auto`, the resolver chose steering on nearly every turn — `α = +0.10` on the
+target attribute and `−0.10` on `Emotional_Numbness`, and on some turns it dropped the emotion
+adapter and steered instead. The measured attribute scores went the right way. A person
+listening described the output as *more emotional, with strange artefacts, and the timbre off*,
+and asked for it to be rolled back. With `GEN_MODE=adapter` the same person called it good
+again.
+
+Nothing in the numbers predicted that, and nothing in them contradicts it either. **Every
+figure in the steering and guidance studies is one model's judgement of another model's
+output**, which those studies say themselves — "no listening test has been run" is in their own
+honest-limits section. A genuineness score and a human ear disagreeing is not a contradiction;
+it is the blind spot of the instrument.
+
+So: the levers are built, tested, documented and reachable. They are not the default until
+somebody has listened to them on purpose. The obvious next experiments, in order of how cheap
+they are:
+
+1. **Halve α.** 0.10 is the study's balanced point; 0.05 was never listened to either.
+2. **Delivery axes only.** The complaint arrived on emotion steering. Delivery is where the
+   measured effect is largest anyway, and it is a different set of directions.
+3. **Drop the `−Emotional_Numbness` component.** Subtracting a second direction doubles the
+   perturbation at a shared layer, and the realised magnitude at `h20` is where the recipes
+   come closest to the ceiling.
+4. **A/B on fixed lines, listened to blind**, rather than scored. That is the measurement
+   nobody has made.
+
+One thing that is *not* suspected: the adapter path itself. `setup/ab_codes.py` compared the
+generated RVQ codes before and after generation modes existed — same seed, same prompt —
+and got the same sha256 over all 84 frames × 12 channels. Whatever changed the sound, it was
+a lever being pulled, not the plumbing moving.
