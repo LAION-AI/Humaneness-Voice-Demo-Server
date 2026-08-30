@@ -412,6 +412,15 @@ the coefficient table records.
   a single attribute's row is ten prompts and is not.
 * **English and German only**, and almost everything measured so far is English.
 
+## Guidance: what a listener said
+
+The family defaults here (3.0 emotion, 2.5 delivery) were chosen by word error
+rate. A person using the CFG sweep in the chat page reported that guidance stays
+usable **up to about 4.0 and degenerates above it** — the first evidence anyone
+has about how these values sound rather than how they score. The strength slider
+allows 1–5 deliberately, so the limit can be heard rather than asserted. See
+[`FIELD_NOTES.md`](FIELD_NOTES.md).
+
 ## What this server actually ships, and why it is not `auto`
 
 **`GEN_MODE` defaults to `adapter`.** Clone this repository, install the assets, run it, and

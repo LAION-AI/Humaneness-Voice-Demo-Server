@@ -503,6 +503,10 @@ speaker similarity. The headline: **SFT3 + DPO-p2 alone is clean — word error
 0.013 and not one invented word in ten takes** — and every further adapter
 degrades that, monotonically in both count and weight.
 
+Listening reports, open questions and what to try next are in
+[`docs/FIELD_NOTES.md`](docs/FIELD_NOTES.md) — the half of the evidence that no
+scorer in this project can produce.
+
 If you are new to the project, start with
 [`docs/LEARNINGS.md`](docs/LEARNINGS.md) — a plain-language account of the
 trailing-speech bug, how it was chased, which suspicions were wrong, and what
