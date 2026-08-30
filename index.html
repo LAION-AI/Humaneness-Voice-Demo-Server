@@ -381,10 +381,11 @@ async function runSweep(){
       const raw = atob(take.pcm);
       const buf = new Uint8Array(raw.length);
       for(let i=0;i<raw.length;i++) buf[i]=raw.charCodeAt(i);
-      const pcm = new Int16Array(buf.buffer);
-      const f32 = new Float32Array(pcm.length);
-      for(let i=0;i<pcm.length;i++) f32[i]=pcm[i]/32768;
-      attachPlayer(node, [f32], j.sr||48000, take.sec, 'g = '+take.guidance);
+      // wavBlob writes setInt16 and the streaming path hands it Int16Array, so
+      // this must stay Int16.  Converting to float -1..1 first made every
+      // sample truncate to zero and produced silence of exactly the right length.
+      attachPlayer(node, [new Int16Array(buf.buffer)], j.sr||48000,
+                   take.sec, 'g = '+take.guidance);
     }
     const d=document.createElement('details'); d.className='cues';
     d.innerHTML = '<summary>neutralisierter Zweig</summary><pre>'+
