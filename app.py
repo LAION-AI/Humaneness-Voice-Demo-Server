@@ -20,6 +20,7 @@ import config
 import levers
 import lora_bank
 import steer_engine
+import timed_script
 from llm_agent import VOICE_TOOL, LLMAgent
 from lora_bank import LoraBank
 from tts_engine import TTSEngine
@@ -394,6 +395,92 @@ async def say(req: Request):
     w = np.concatenate(chunks) if chunks else np.zeros(1, np.float32)
     pcm = np.clip(w * 32767, -32768, 32767).astype("<i2").tobytes()
     return {"sr": tts.sr, "pcm": base64.b64encode(pcm).decode(), **meta}
+
+
+@app.post("/api/cfg_sweep")
+async def cfg_sweep(req: Request):
+    """Render one line several times, changing only the guidance strength.
+
+    The point is an A/B a person can actually judge: same script, same adapters,
+    same seed, same reference clips, one number different.  Nothing is streamed —
+    the takes are generated and returned together, and the browser lets you pick
+    between them.  A guided take costs about 1.93x wall clock, so a four-value
+    sweep is a couple of minutes.
+    """
+    import base64
+    b = await req.json()
+    tts, bank = STATE["tts"], STATE["bank"]
+    if not tts:
+        return JSONResponse({"error": "not ready"}, status_code=503)
+    script = (b.get("script") or "").strip()
+    if not script:
+        return JSONResponse({"error": "no script"}, status_code=400)
+    general = b.get("general") or ""
+    language = b.get("language") or "English"
+    values = b.get("guidance") or [1.0, 1.5, 2.0, 3.0]
+    try:
+        values = [float(v) for v in values][:8]
+    except (TypeError, ValueError):
+        return JSONResponse({"error": "bad guidance values"}, status_code=400)
+
+    profs = STATE["profiles"] or {}
+    prof = profs.get(b.get("profile") or config.DEFAULT_PROFILE)
+    ref = []
+    if bank:
+        a = bank.anchor(prof["anchor"]) if prof else bank.anchor()
+        if a is not None:
+            ref.append(a)
+    specs = [(n, float(l)) for n, l in (b.get("loras") or [])]
+    seed = int(b.get("seed") or 1234)
+    lc = "DE" if str(language).lower().startswith(("ger", "de")) else "EN"
+
+    tagged, frames, plain = timed_script.render(script)
+    if not plain:
+        return JSONResponse({"error": "script renders empty"}, status_code=400)
+    gl = timed_script.general_line(general, frames / config.FRAME_RATE, lc,
+                                   b.get("reads_as"))
+    instruction = f"GENERAL: {gl}\nSCRIPT:\n{tagged}"
+    # the director builds this by dropping its own delivery clause; the client
+    # passes it back so both branches differ in affect and in nothing else
+    gen_unc = b.get("general_unc") or general
+    unc_tagged = timed_script.neutralise(tagged)
+    gl_unc = timed_script.general_line(gen_unc, frames / config.FRAME_RATE, lc, None)
+    instruction_unc = f"GENERAL: {gl_unc}\nSCRIPT:\n{unc_tagged}"
+
+    out = []
+    for g in values:
+        plan = levers.Plan()
+        plan.requested = "adapter+cfg" if g > 1.0001 else "adapter"
+        plan.mode = plan.requested
+        plan.guidance = float(g)   # wants_cfg is derived from it
+        chunks, meta = [], {}
+
+        def run(_g=g, _plan=plan):
+            for kind, payload in tts.stream_pcm(
+                    text=tagged, instruction=instruction, language=language,
+                    ref_codes=ref or None, lora_specs=specs, tokens=frames,
+                    seed=seed, lever_plan=_plan,
+                    instruction_unc=instruction_unc if _g > 1.0001 else None,
+                    text_unc=unc_tagged if _g > 1.0001 else None):
+                if kind == "pcm":
+                    chunks.append(payload)
+                elif kind == "end":
+                    meta.update(payload)
+        t0 = time.time()
+        try:
+            await asyncio.get_running_loop().run_in_executor(None, run)
+        except Exception as e:
+            out.append({"guidance": g, "error": str(e)[:200]})
+            continue
+        w = np.concatenate(chunks) if chunks else np.zeros(1, np.float32)
+        pcm = np.clip(w * 32767, -32768, 32767).astype("<i2").tobytes()
+        out.append({"guidance": g, "pcm": base64.b64encode(pcm).decode(),
+                    "sec": round(len(w) / tts.sr, 3),
+                    "ms": round((time.time() - t0) * 1000, 1),
+                    "rtf": meta.get("rtf")})
+    return {"sr": tts.sr, "takes": out, "tokens": frames,
+            "script": tagged, "script_unc": unc_tagged,
+            "instruction": instruction, "instruction_unc": instruction_unc}
 
 
 @app.post("/api/say_batch")
@@ -814,12 +901,29 @@ async def turn(req: Request):
                                       if n.startswith("sft3_voicenet:")},
             attribute_adapter=attr_adapter,
             cfg_available=bool(out.get("general_unc")))
+        # an explicit strength from the UI slider overrides the measured operating
+        # point, and says so, so the payload never claims a number it did not use
+        gv = body.get("guidance")
+        if gv is not None and plan is not None and plan.wants_cfg:
+            try:
+                gv = float(gv)
+            except (TypeError, ValueError):
+                gv = None
+            if gv and abs(gv - float(plan.guidance or 1.0)) > 1e-6:
+                plan.note(f"guidance set to {gv:g} by the request, overriding the "
+                          f"{plan.operating_point or 'measured'} value "
+                          f"{float(plan.guidance or 1.0):g}")
+                plan.guidance = gv
+                plan.operating_point = "request"
         if plan.drop_adapter:
             specs = [x for x in specs if x[0] != plan.drop_adapter]
         print(plan.log_line(), flush=True)
 
         yield _ev({"type": "llm", "levers": plan.payload(),
                    "reply": out["reply"], "general": out["general"],
+                   # the neutralised half, so the browser can ask for a sweep on
+                   # exactly this line without the director running again
+                   "general_unc": out.get("general_unc"),
                    "script": out["script"], "voice": out.get("voice"),
                    "chosen": chosen, "llm_ms": round(llm_ms, 1),
                    "select_ms": round(sel_ms, 1), "language": out.get("language"),

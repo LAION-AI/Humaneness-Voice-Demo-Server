@@ -197,6 +197,9 @@
     <textarea id="q" rows="1" placeholder="Say something to your voice actor…  (Enter to send)"></textarea>
     <button id="mic" class="icon" title="Record (speak instead of typing)">●</button>
     <button id="send">Send</button>
+    <button id="sweepbtn" disabled title="Dieselbe Zeile mehrfach rendern, nur der CFG-Faktor unterscheidet sich. Nichts spielt automatisch."
+            style="background:var(--panel2);border:1px solid var(--line);color:var(--fg);
+                   border-radius:9px;padding:0 13px;cursor:pointer;font:14px inherit">Sweep</button>
   </div>
   <div class="row" id="recbar" style="display:none;align-items:center">
     <span class="recdot"></span>
@@ -239,6 +242,19 @@
       <input type="checkbox" id="pure"> Pure <i>(Basis + Referenz)</i></label>
     <label title="Die Regieanweisungen waehlen per Retrieval einen Emotions-Adapter, gemergt mit dem publizierten Wert 1.5. Aus: nur SFT3-Basis + abgerufener Referenzclip.">
       <input type="checkbox" id="emonuance" checked> Emotions-Nuancen <i>(Adapter @1.5)</i></label>
+    <label title="Classifier-free guidance: der Satz wird zweimal gerechnet, einmal mit und einmal ohne Regieanweisung, und der Unterschied wird verstaerkt. Kostet ~1.9x Rechenzeit und streamt deshalb nicht.">
+      <input type="checkbox" id="cfg"> CFG <i>(Guidance)</i></label>
+    <label title="Wie stark der Unterschied zwischen beiden Zweigen verstaerkt wird. 1.0 = aus.">
+      CFG-Staerke
+      <input id="cfgs" type="range" min="1" max="5" step="0.25" value="2.0">
+      <b id="cfgsv">2.00</b></label>
+    <label title="Statt einer Fassung mehrere erzeugen, die sich NUR im CFG-Faktor unterscheiden. Nichts spielt automatisch; du klickst die Fassungen im Chat an.">
+      <input type="checkbox" id="cfgsweep"> CFG-Sweep <i>(mehrere Faktoren)</i></label>
+    <label title="Komma-getrennte CFG-Faktoren fuer den Sweep.">
+      Sweep-Werte
+      <input id="cfgvals" type="text" value="1.0, 1.5, 2.0, 3.0"
+             style="width:110px;background:var(--panel2);border:1px solid var(--line);
+                    color:var(--fg);border-radius:6px;padding:2px 6px;font:12px var(--mono)"></label>
     <label title="Charakter-Adapter dieser Stimme dazu. Trainiert gegen die ungetunten v2-Gewichte, auf dem SFT+DPO-Checkpoint also off-distribution.">
       <input type="checkbox" id="charlora" checked> Char-LoRA</label>
     <label title="Chatterbox schiebt die Ausgabe nachtraeglich auf den Anker-Sprecher — mehr Identität, aber 24 kHz statt 48 kHz">
@@ -299,22 +315,84 @@ function wavBlob(chunks, sr){
   for(const c of chunks){ for(let i=0;i<c.length;i++){ v.setInt16(o, c[i], true); o+=2; } }
   return new Blob([buf], {type:'audio/wav'});
 }
-function attachPlayer(node, chunks, sr, secs){
-  if(!node || !chunks.length) return;
+function attachPlayer(node, chunks, sr, secs, label){
+  if(!node || !chunks.length) return null;
   const url = URL.createObjectURL(wavBlob(chunks, sr));
   const box = document.createElement('div'); box.className = 'player';
   const btn = document.createElement('button'); btn.textContent = '▶'; btn.title = 'Play again';
   const au = new Audio(url);
   btn.onclick = ()=>{
-    if(au.paused){ au.currentTime = 0; au.play(); btn.textContent='■'; }
+    if(au.paused){ au.play(); btn.textContent='■'; }
     else { au.pause(); btn.textContent='▶'; }
   };
-  au.onended = ()=> btn.textContent = '▶';
+  au.onended = ()=>{ btn.textContent = '▶'; };
+  // a clock to a tenth of a second, and a bar you can scrub — this is a
+  // debugging tool as much as a player: "where exactly does it start mumbling"
+  // is not a question you can answer from a play button
+  const t = document.createElement('span'); t.className='dur';
+  t.style.fontVariantNumeric='tabular-nums';
+  const fmt = x => (x||0).toFixed(1).padStart(4,'0');
+  const show = ()=> t.textContent = fmt(au.currentTime)+' / '+fmt(secs)+' s';
+  show();
+  au.ontimeupdate = show;
+  const seek = document.createElement('input');
+  seek.type='range'; seek.min=0; seek.max=Math.max(secs,0.1); seek.step=0.01; seek.value=0;
+  seek.style.cssText='width:150px;accent-color:var(--accent);vertical-align:middle';
+  au.ontimeupdate = ()=>{ show(); if(!seek.dragging) seek.value = au.currentTime; };
+  seek.oninput = ()=>{ seek.dragging=true; au.currentTime = parseFloat(seek.value); show(); };
+  seek.onchange = ()=>{ seek.dragging=false; };
   const a = document.createElement('a');
   a.href = url; a.download = 'moss-take-' + Date.now() + '.wav'; a.textContent = 'save .wav';
-  const d = document.createElement('span'); d.className='dur'; d.textContent = secs.toFixed(1)+' s · 48 kHz';
-  box.appendChild(btn); box.appendChild(d); box.appendChild(a);
+  if(label){ const L=document.createElement('b'); L.textContent=label;
+             L.style.cssText='color:var(--accent2);margin-right:6px'; box.appendChild(L); }
+  box.appendChild(btn); box.appendChild(seek); box.appendChild(t); box.appendChild(a);
   node.appendChild(box);
+  return au;
+}
+
+/* ---------------- CFG sweep --------------------------------------------- */
+// Same script, same adapters, same seed, one number different.  Nothing plays by
+// itself: the whole point is to click between the versions and hear where the
+// guidance starts costing more than it buys.
+async function runSweep(){
+  const t = window._lastTurn;
+  if(!t || !t.script){ addMsg('bot','⚠ Erst eine Antwort erzeugen, dann sweepen.'); return; }
+  const vals = ($('cfgvals').value||'').split(/[,;\s]+/)
+                 .map(parseFloat).filter(x=>!isNaN(x) && x>=1 && x<=8).slice(0,8);
+  if(!vals.length){ addMsg('bot','⚠ Keine gueltigen Sweep-Werte.'); return; }
+  const node = addMsg('bot', 'CFG-Sweep laeuft: ' + vals.join(', ') + ' — das dauert, nichts spielt automatisch.');
+  $('sweepbtn').disabled = true; $('send').disabled = true;
+  const t0 = performance.now();
+  try{
+    const res = await fetch('/api/cfg_sweep', {method:'POST',
+      headers:{'content-type':'application/json'},
+      body: JSON.stringify({general:t.general, general_unc:t.general_unc,
+                            script:t.script, language:t.language,
+                            profile:t.profile, loras:t.loras, guidance:vals})});
+    if(!res.ok){ addMsg('bot','⚠ Sweep '+res.status+': '+(await res.text()).slice(0,200)); return; }
+    const j = await res.json();
+    node.querySelector('.bubble').textContent =
+      'CFG-Sweep · ' + vals.length + ' Fassungen · ' +
+      ((performance.now()-t0)/1000).toFixed(0) + ' s';
+    for(const take of (j.takes||[])){
+      if(take.error){ const e=document.createElement('div'); e.className='dur';
+                      e.textContent = 'g='+take.guidance+' fehlgeschlagen: '+take.error;
+                      node.appendChild(e); continue; }
+      const raw = atob(take.pcm);
+      const buf = new Uint8Array(raw.length);
+      for(let i=0;i<raw.length;i++) buf[i]=raw.charCodeAt(i);
+      const pcm = new Int16Array(buf.buffer);
+      const f32 = new Float32Array(pcm.length);
+      for(let i=0;i<pcm.length;i++) f32[i]=pcm[i]/32768;
+      attachPlayer(node, [f32], j.sr||48000, take.sec, 'g = '+take.guidance);
+    }
+    const d=document.createElement('details'); d.className='cues';
+    d.innerHTML = '<summary>neutralisierter Zweig</summary><pre>'+
+                  (j.script_unc||'').replace(/[<>&]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]))+'</pre>';
+    node.appendChild(d);
+  } catch(e){ addMsg('bot','⚠ Sweep-Fehler: '+e); }
+  finally { $('sweepbtn').disabled=false; $('send').disabled=false;
+            chat.scrollTop = chat.scrollHeight; }
 }
 
 /* ---------------- UI helpers --------------------------------------------- */
@@ -441,6 +519,8 @@ async function send(){
                             speaker_lora_lam: parseFloat($('spk').value),
 
                             stop_bias: parseFloat($('stopb').value),
+                            gen_mode: $('cfg').checked ? 'adapter+cfg' : 'adapter',
+                            guidance: parseFloat($('cfgs').value),
                             ...(()=>{ const q=adpPayload();
                                  // the Aesthetics slider is the same adapter the
                                  // overlay lists, so it writes into the same field
@@ -490,6 +570,11 @@ async function send(){
             det.open = true;
             det.innerHTML = `<summary>direction</summary><pre>GENERAL: ${ev.general}\n\nSCRIPT:\n${mk(ev.script)}</pre>`;
             window._lastDet = det; window._mk = mk;
+            window._lastTurn = {general: ev.general, general_unc: ev.general_unc,
+                                script: ev.script, language: ev.language,
+                                profile: ev.profile,
+                                loras: (ev.loras||[]).map(l=>[l.name, l.lam])};
+            $('sweepbtn').disabled = !(ev.script && ev.general_unc);
             node.appendChild(meta); node.appendChild(det);
             chat.scrollTop = chat.scrollHeight;
             setL('m_llm', fmt(ev.llm_ms)); setL('m_sel', fmt(ev.select_ms));
@@ -551,7 +636,8 @@ $('send').onclick = send;
 $('vol').addEventListener('input', e=>{ if(gain) gain.gain.value = parseFloat(e.target.value); });
 const dial = (id,out)=>{ const f=()=> $(out).textContent = parseFloat($(id).value).toFixed(2);
                          $(id).addEventListener('input', f); f(); };
-dial('spk','spkv'); dial('aes','aesv'); dial('stopb','stopbv'); dial('plam','plamv');
+dial('spk','spkv'); dial('aes','aesv'); dial('stopb','stopbv'); dial('plam','plamv'); dial('cfgs','cfgsv');
+$('sweepbtn').onclick = runSweep;
 // the ten speaker profiles, each with its own anchor recording and adapter
 fetch('/api/state').then(r=>r.json()).then(s=>{
   const ps=s.profiles||[];
