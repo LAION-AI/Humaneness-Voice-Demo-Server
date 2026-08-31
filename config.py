@@ -524,8 +524,24 @@ QUALITY_LABELS = {
 # are dosed low: a burst that is merely present gets 0.25, one the director
 # marked as intense gets 0.5.  Higher starts to drag the whole line towards the
 # burst.
+# SWEPT 2026-08-31 (docs/MEASURED_2026-08-31.md §4; research protocol §43).  These were
+# conservative guesses carried over from the older seven-adapter set and FIELD_NOTES.md flagged
+# that as an oversight rather than a decision.  Ten weights, 0.2..1.5, under this exact stack,
+# 2,420 cells: the pre-registered rule returns "none qualifies" in all three panels that bear on
+# shipping, no weight beats the shipped one by a detectable margin, and turning the adapter off is
+# significantly WORSE (-0.061, t -2.32).  So these stay -- now measured rather than assumed.
+#
+# One honest caveat, because it points the other way: the pre-registered metric `r_burst_cls`
+# penalises extra and longer bursts, which is what raising the dose produces.  On plain hit-rate
+# the dose does move (+0.061 at 0.5 -> +0.091 at 1.5, t 2.98), with its maximum at the TOP of the
+# swept range -- an edge, not an optimum.  A forced-choice listening test at 0.5/1.0/1.5 would
+# settle it; the clips exist.  Until then a shipped default is not changed on a post-hoc metric.
 BURST_LAM = float(os.environ.get("MOSS_BURST_LAM", "0.25"))
 BURST_LAM_INTENSE = float(os.environ.get("MOSS_BURST_LAM_INTENSE", "0.5"))
+# Three of six tested classes essentially never realise AT ANY DOSE: frustrated_groan 0/1188,
+# shriek 11/1045, in both arms and both script kinds.  The model substitutes down the arousal
+# axis rather than falling silent.  No merge weight fixes that -- do not reach for this dial when
+# a shriek or a groan fails to appear.
 
 # ---------------------------------------------------------------- generation modes
 # THE THREE LEVERS.  Until now this server had exactly one way to shape a performance:
@@ -555,6 +571,11 @@ BURST_LAM_INTENSE = float(os.environ.get("MOSS_BURST_LAM_INTENSE", "0.5"))
 # any of its results, and every figure in it is one model judging another model's
 # output.  `auto` and the rest stay one environment variable away:
 #     MOSS_GEN_MODE=auto|adapter+steer|adapter+cfg|steer|cfg
+# Rollback confirmed 2026-08-31, and the reason is now written down where a proposer will hit it:
+# the WikiSkill index still recommends a `steer` mode for most of the 40 emotions, so the tables
+# someone reads to pick a recipe disagree with this default.  docs/MEASURED_2026-08-31.md §1
+# supersedes them.  Where steering was an attribute's only usable operating point, the honest
+# reading is "no measured lever for this attribute", not "use steering anyway".
 GEN_MODE = os.environ.get("MOSS_GEN_MODE", "adapter")
 # Both levers are individually killable, and with either off the modes that need it degrade
 # to `adapter` and say so in the response payload rather than reporting a mode that is not
@@ -621,7 +642,23 @@ NUMBNESS_SUBTRACTION = os.environ.get("MOSS_NUMBNESS", "with_steer")
 # value.  Below 1 guidance actively hurts (-0.0370 at g = 0.5, t -2.56).
 CFG_G = {"emo": 3.0, "vn": 2.5, "qual": 2.5}
 CFG_G_MIN = float(os.environ.get("MOSS_CFG_G_MIN", "1.5"))
-CFG_G_MAX = float(os.environ.get("MOSS_CFG_G_MAX", "3.0"))
+# RAISED 3.0 -> 4.0.  This is the change in PR #6, folded in here because the evidence for it has
+# since doubled.  PR #6 rested on one listener (FIELD_NOTES.md: "fine up to about 4.0, above that
+# it degenerates"), against an old bound that was never measured either -- 3.0 was simply the
+# largest family default, reused as a ceiling.  The gap mattered: levers.py clamps the resolved
+# value here, so a director asking for 4 silently got 3 and the range the report calls good was
+# unreachable through the automatic path.
+#
+# The crossfade study then measured guidance from a completely different direction and agreed.
+# Separation between two intended emotions rises monotonically with g -- 0.797 / 1.013 / 1.934 /
+# 2.239 SD at g = 0/2/3/4, with 11/14/18/23 of 30 texts clearing 1 SD and no reversal anywhere in
+# the grid.  Guidance does not merely raise an emotion score; it makes two emotions more
+# DISTINGUISHABLE from each other.  See docs/MEASURED_2026-08-31.md §2.
+#
+# The family defaults in CFG_G are deliberately unchanged: the evidence says 4.0 is the top of the
+# usable range, not that the defaults are too low.  Cost stays 1.90-1.94x and is the same at every
+# g -- the price is the second branch, not the strength.
+CFG_G_MAX = float(os.environ.get("MOSS_CFG_G_MAX", "4.0"))
 # Measured at batch 1: 1.89-1.94x over four cells, sd 0.053.  The intuition that only the
 # semantic transformer doubles is wrong -- the local transformer doubles too, running twelve
 # times per frame per branch, and the codec decode, the only genuinely shared component, is
