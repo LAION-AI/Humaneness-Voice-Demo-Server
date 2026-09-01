@@ -705,7 +705,7 @@ ALIGN_EVERY_S = float(os.environ.get("MOSS_ALIGN_EVERY", "0.5"))
 # actively preferred the take that keeps talking.  Off by default all the same,
 # because nobody has heard it.
 QDPO_LORAS = {
-    "sft3_qdpo:quality_dpo":    float(os.environ.get("MOSS_LAM_QDPO", "1.0")),
+    "sft3_qdpo:quality_dpo":    float(os.environ.get("MOSS_LAM_QDPO", "1.5")),
     "sft3_qdpo:burst_stop_dpo": float(os.environ.get("MOSS_LAM_BSDPO", "0.0")),
     "sft3_qdpo:quality_dpo_step1504": 0.0,
 }

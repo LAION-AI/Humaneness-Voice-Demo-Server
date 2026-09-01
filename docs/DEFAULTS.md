@@ -123,7 +123,7 @@ environment variable too, so nothing here needs a code edit to change.
 | `CONTINUITY` | `the same speaker continues without interruption: identical voice, identical person, same microphone and same room.` |
 | `DELIVERY_LEVER` | `adapter` |
 | `EIV_DIR` | `/mnt/nvme/empathic-insights-voice-small` |
-| `EMOTION_NAMES` | `{'Disappointment', 'Contentment', 'Doubt', 'Triumph', 'Awe', 'Longing', 'Amusement', 'Sadness', 'Contempt', 'Astonishment_Surprise', 'Interest', 'Intoxication_Altered_States_of_Consciousness', 'Fatigu …` |
+| `EMOTION_NAMES` | `{'Emotional_Numbness', 'Fear', 'Bitterness', 'Thankfulness_Gratitude', 'Disappointment', 'Distress', 'Hope_Enthusiasm_Optimism', 'Disgust', 'Shame', 'Embarrassment', 'Intoxication_Altered_States_of_Co …` |
 | `GEN_MODE` | `adapter` |
 | `HISTORY_TURNS_LOCAL` | `8` |
 | `HISTORY_TURNS_LUNA` | `40` |
@@ -135,7 +135,7 @@ environment variable too, so nothing here needs a code edit to change.
 | `MEANVC2_ROOT` | `/mnt/nvme/moss-15-v2-assets/MeanVC2` |
 | `NUMBNESS_SUBTRACTION` | `with_steer` |
 | `QDPO_LABELS` | `{'sft3_qdpo:quality_dpo': 'Quality DPO (step376)', 'sft3_qdpo:burst_stop_dpo': 'Burst + stop DPO (step896)', 'sft3_qdpo:quality_dpo_step1504': 'Quality DPO (step1504, not recommended)'}` |
-| `QDPO_LORAS` | `{'sft3_qdpo:quality_dpo': 1.0, 'sft3_qdpo:burst_stop_dpo': 0.0, 'sft3_qdpo:quality_dpo_step1504': 0.0}` |
+| `QDPO_LORAS` | `{'sft3_qdpo:quality_dpo': 1.5, 'sft3_qdpo:burst_stop_dpo': 0.0, 'sft3_qdpo:quality_dpo_step1504': 0.0}` |
 | `QUALITY_AXES` | `('genuineness_high', 'blend_high', 'esthetics_high')` |
 | `QUALITY_CONFLICTS` | `{'sft3_quality:esthetics_high': {'S_RANT_high': 0.0, 'S_DRAM_high': 0.5}}` |
 | `QUALITY_LABELS` | `{'sft3_quality:genuineness_high': 'Genuineness', 'sft3_quality:blend_high': 'Burst blend', 'sft3_quality:esthetics_high': 'Aesthetics'}` |
