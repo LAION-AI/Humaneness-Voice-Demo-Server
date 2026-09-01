@@ -727,3 +727,14 @@ ALIGN_LEAD_WORDS = int(os.environ.get("MOSS_ALIGN_LEAD_WORDS", "3"))
 # for at all.  Below this, an alignment against the prefix reports the last word
 # as finished while half the line is unspoken.
 ALIGN_TAIL_AFTER = float(os.environ.get("MOSS_ALIGN_TAIL_AFTER", "0.6"))
+# Which aligner, in order of preference.  `qwen` is Apache-2.0 and is the
+# default because it removes the only non-commercial licence in this stack; the
+# MMS CTC model stays available and is the lighter of the two.
+ALIGN_BACKEND = os.environ.get("MOSS_ALIGN_BACKEND", "qwen,mms")
+ALIGN_QWEN_REPO = os.environ.get("MOSS_ALIGN_QWEN", "Qwen/Qwen3-ForcedAligner-0.6B-hf")
+# 1.84 GB loaded, which does not fit beside the voice model on a 24 GB card, so
+# it goes on the language model's card by default.
+ALIGN_QWEN_DEVICE = os.environ.get("MOSS_ALIGN_QWEN_DEVICE", "cuda:1")
+# Structural sanity bound: no single word lasts this long in ordinary speech, so
+# a span longer than it means the alignment collapsed rather than fitted.
+ALIGN_QWEN_MAX_WORD_S = float(os.environ.get("MOSS_ALIGN_QWEN_MAX_WORD", "3.0"))

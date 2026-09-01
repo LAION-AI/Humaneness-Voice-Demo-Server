@@ -90,6 +90,7 @@ environment variable too, so nothing here needs a code edit to change.
 | setting | value |
 |---|---|
 | `AGENT_PICKS_MODE` | `True` |
+| `ALIGN_BACKEND` | `qwen,mms` |
 | `ALIGN_BURST_SLACK` | `2.0` |
 | `ALIGN_DEVICE` | `cuda` |
 | `ALIGN_DIR` | `/mnt/nvme/moss-15-v2-assets/aligner` |
@@ -101,6 +102,9 @@ environment variable too, so nothing here needs a code edit to change.
 | `ALIGN_LOOKAHEAD_S` | `0.5` |
 | `ALIGN_MIN_SCORE` | `0.35` |
 | `ALIGN_ON` | `True` |
+| `ALIGN_QWEN_DEVICE` | `cuda:1` |
+| `ALIGN_QWEN_MAX_WORD_S` | `3.0` |
+| `ALIGN_QWEN_REPO` | `Qwen/Qwen3-ForcedAligner-0.6B-hf` |
 | `ALIGN_TAIL_AFTER` | `0.6` |
 | `ALIGN_TAIL_MIN_S` | `0.25` |
 | `ALIGN_TAIL_PAD_S` | `0.12` |
@@ -119,7 +123,7 @@ environment variable too, so nothing here needs a code edit to change.
 | `CONTINUITY` | `the same speaker continues without interruption: identical voice, identical person, same microphone and same room.` |
 | `DELIVERY_LEVER` | `adapter` |
 | `EIV_DIR` | `/mnt/nvme/empathic-insights-voice-small` |
-| `EMOTION_NAMES` | `{'Thankfulness_Gratitude', 'Pain', 'Fatigue_Exhaustion', 'Amusement', 'Disgust', 'Disappointment', 'Contentment', 'Helplessness', 'Fear', 'Teasing', 'Affection', 'Sourness', 'Longing', 'Contempt', 'In …` |
+| `EMOTION_NAMES` | `{'Disappointment', 'Contentment', 'Doubt', 'Triumph', 'Awe', 'Longing', 'Amusement', 'Sadness', 'Contempt', 'Astonishment_Surprise', 'Interest', 'Intoxication_Altered_States_of_Consciousness', 'Fatigu …` |
 | `GEN_MODE` | `adapter` |
 | `HISTORY_TURNS_LOCAL` | `8` |
 | `HISTORY_TURNS_LUNA` | `40` |

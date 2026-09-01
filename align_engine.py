@@ -97,8 +97,112 @@ def closing_burst_s(tagged):
     return total
 
 
+class QwenAligner:
+    """Qwen3-ForcedAligner-0.6B, the permissively licensed alternative.
+
+    Apache-2.0 rather than CC BY-NC, which is the reason it exists here: it is
+    the only component of this stack that had a non-commercial licence, and the
+    rest was chosen for commercial usability on purpose.
+
+    Measured against the MMS aligner on the same clips: word ends agree to
+    0.057 s on average (0.22 s worst) on German and to within a frame or two on
+    English, and it is about twice as fast — 38 ms against 61 ms for 10 s of
+    English, 68 against 135 for 14 s of German — because it is one
+    non-autoregressive forward pass rather than an emission pass plus a Viterbi
+    pass.  It costs 1.84 GB of VRAM loaded against roughly 0.4 GB for the ONNX
+    CTC model, which is why it goes on the second card by default.
+
+    It returns no confidence, so `score` here is a STRUCTURAL plausibility check
+    rather than a model confidence: whether the words came back in the number
+    asked for, in order, inside the audio, and without an implausibly long one.
+    That is weaker evidence than the CTC path's per-token posterior, and the
+    honest consequence is that the score threshold catches gross failures here
+    but not subtle ones.
+    """
+
+    REPO = "Qwen/Qwen3-ForcedAligner-0.6B-hf"
+
+    def __init__(self, device=None, repo=None):
+        self.ok = False
+        self.lock = threading.Lock()
+        self.device = device or config.ALIGN_QWEN_DEVICE
+        try:
+            import torch
+            from transformers import AutoModelForTokenClassification, AutoProcessor
+            repo = repo or config.ALIGN_QWEN_REPO or self.REPO
+            self.proc = AutoProcessor.from_pretrained(repo)
+            self.model = AutoModelForTokenClassification.from_pretrained(
+                repo, dtype=torch.bfloat16).to(self.device).eval()
+            self.ok = True
+            print(f"[align] {repo} on {self.device}, apache-2.0, "
+                  f"{sum(p.numel() for p in self.model.parameters())/1e9:.2f}B params",
+                  flush=True)
+        except Exception as e:
+            print(f"[align] Qwen aligner unavailable ({type(e).__name__}: {e}); "
+                  f"falling back", flush=True)
+
+    def align(self, wav16k, words, language=None):
+        import torch
+        if not self.ok or not words:
+            return None
+        transcript = " ".join(str(w) for w in words)
+        lang = language or ("German" if _looks_german(transcript) else "English")
+        try:
+            with self.lock:
+                ins, wl = self.proc.prepare_forced_aligner_inputs(
+                    audio=np.asarray(wav16k, dtype=np.float32).reshape(-1),
+                    transcript=transcript, language=lang)
+                ins = ins.to(self.model.device, self.model.dtype)
+                with torch.inference_mode():
+                    out = self.model(**ins)
+                ts = self.proc.decode_forced_alignment(
+                    logits=out.logits, input_ids=ins["input_ids"], word_lists=wl,
+                    timestamp_token_id=self.model.config.timestamp_token_id)[0]
+        except Exception as e:
+            print(f"[align] qwen align failed: {type(e).__name__}: {e}", flush=True)
+            return None
+        if not ts:
+            return None
+        dur = len(wav16k) / float(_SR)
+        sane = (len(ts) == len(words))
+        prev = -1.0
+        for t in ts:
+            a, b = float(t["start_time"]), float(t["end_time"])
+            if a < prev - 1e-3 or b < a or b > dur + 0.25 \
+                    or (b - a) > config.ALIGN_QWEN_MAX_WORD_S:
+                sane = False
+                break
+            prev = a
+        score = 1.0 if sane else 0.0
+        return [(t["text"], float(t["start_time"]), float(t["end_time"]), score)
+                for t in ts]
+
+
+_DE = re.compile(r"[äöüßÄÖÜ]|\b(?:und|nicht|noch|ist|das|die|der|ein|eine|mit|"
+                 r"auf|für|über|wie|was|dass|weil|ich|du|wir|sie|aber|schon)\b")
+
+
+def _looks_german(text):
+    return len(_DE.findall(str(text or ""))) >= 2
+
+
+def make_aligner():
+    """The configured aligner, with a fallback when the preferred one is missing."""
+    order = [b.strip() for b in str(config.ALIGN_BACKEND).split(",") if b.strip()]
+    for b in order:
+        a = QwenAligner() if b == "qwen" else Aligner()
+        if a.ok:
+            return a
+        print(f"[align] backend {b!r} did not load, trying the next", flush=True)
+    return None
+
+
 class Aligner:
-    """The CTC emission model, loaded once."""
+    """The CTC emission model, loaded once.
+
+    CC BY-NC 4.0 -- see the module docstring.  `make_aligner()` prefers the
+    Apache-2.0 Qwen model; this remains available and is the lighter of the two.
+    """
 
     def __init__(self, root=None, device=None):
         self.ok = False

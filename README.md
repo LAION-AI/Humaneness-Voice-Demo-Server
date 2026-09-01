@@ -525,8 +525,9 @@ alignment against the script, fading in at the first word and cutting after the
 last, in the stream as well as offline. Measured over 36 takes it removes 86 % of
 the invented words and lowers word error. A scripted burst at either end is left
 alone. On by default; checkbox in the page; see
-[`docs/ALIGNMENT.md`](docs/ALIGNMENT.md), and note the aligner's CC BY-NC licence
-there if you deploy commercially.
+[`docs/ALIGNMENT.md`](docs/ALIGNMENT.md), The aligner is
+`Qwen/Qwen3-ForcedAligner-0.6B-hf`, Apache-2.0; the CC BY-NC MMS aligner remains
+available as a fallback.
 
 ## Generation modes
 

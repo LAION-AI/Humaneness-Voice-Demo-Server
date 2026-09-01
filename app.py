@@ -130,7 +130,7 @@ def _boot():
             # into the process -- onnxruntime finds them there and takes the CUDA
             # provider.  Loaded before torch it silently falls back to CPU, which
             # is 20x slower and too slow to keep a stream fed.
-            STATE["aligner"] = align_engine.Aligner()
+            STATE["aligner"] = align_engine.make_aligner()
         except Exception as e:
             print(f"[align] unavailable: {e}", flush=True)
         try:

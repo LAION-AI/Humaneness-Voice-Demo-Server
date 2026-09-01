@@ -69,13 +69,15 @@ def main():
     ap.add_argument("--seeds", type=int, default=3)
     ap.add_argument("--bsdpo", type=float, default=0.0,
                     help="also load the burst+stop preference adapter at this weight")
+    ap.add_argument("--backend", default="mms", choices=["mms", "qwen"])
     ap.add_argument("--out", default="/mnt/nvme/moss-15-v2-assets/align_eval.json")
     a = ap.parse_args()
     stack = list(STACK)
     if a.bsdpo > 0:
         stack.append(("sft3_qdpo:burst_stop_dpo", a.bsdpo))
     asr = ASR()
-    aligner = ae.Aligner(device="cpu")     # the server holds the GPU session
+    aligner = (ae.QwenAligner(device="cuda:0") if a.backend == "qwen"
+               else ae.Aligner(device="cpu"))   # the server holds the MMS GPU session
     rows = []
     for li, (script, kind) in enumerate(LINES):
         tagged, frames, plain = timed_script.render(script)
