@@ -149,6 +149,10 @@ LORA_ROOTS = {
     "sft3_voicenet": "/mnt/nvme/moss-15-v2-assets/loras/sft3_voicenet",
     # genuineness / vocal-burst blend / aesthetics, one per perceptual axis
     "sft3_quality":  "/mnt/nvme/moss-15-v2-assets/loras/sft3_quality",
+    # Two preference-tuned adapters, both rank 16.  Each targets audio_lm_heads
+    # 0-11 AND text_lm_head -- 12 of its 23 modules are weight-tied, so all
+    # twelve are hooked rather than merged (see docs/ADAPTERS.md).
+    "sft3_qdpo":     "/mnt/nvme/moss-15-v2-assets/loras/sft3_qdpo",
     "sports":    _snap("laion/moss-sports-commentator-lora"),
     # the anchor speaker as a trained adapter — the direct route to a consistent
     # voice, as opposed to converting after the fact
@@ -524,24 +528,8 @@ QUALITY_LABELS = {
 # are dosed low: a burst that is merely present gets 0.25, one the director
 # marked as intense gets 0.5.  Higher starts to drag the whole line towards the
 # burst.
-# SWEPT 2026-08-31 (docs/MEASURED_2026-08-31.md §4; research protocol §43).  These were
-# conservative guesses carried over from the older seven-adapter set and FIELD_NOTES.md flagged
-# that as an oversight rather than a decision.  Ten weights, 0.2..1.5, under this exact stack,
-# 2,420 cells: the pre-registered rule returns "none qualifies" in all three panels that bear on
-# shipping, no weight beats the shipped one by a detectable margin, and turning the adapter off is
-# significantly WORSE (-0.061, t -2.32).  So these stay -- now measured rather than assumed.
-#
-# One honest caveat, because it points the other way: the pre-registered metric `r_burst_cls`
-# penalises extra and longer bursts, which is what raising the dose produces.  On plain hit-rate
-# the dose does move (+0.061 at 0.5 -> +0.091 at 1.5, t 2.98), with its maximum at the TOP of the
-# swept range -- an edge, not an optimum.  A forced-choice listening test at 0.5/1.0/1.5 would
-# settle it; the clips exist.  Until then a shipped default is not changed on a post-hoc metric.
 BURST_LAM = float(os.environ.get("MOSS_BURST_LAM", "0.25"))
 BURST_LAM_INTENSE = float(os.environ.get("MOSS_BURST_LAM_INTENSE", "0.5"))
-# Three of six tested classes essentially never realise AT ANY DOSE: frustrated_groan 0/1188,
-# shriek 11/1045, in both arms and both script kinds.  The model substitutes down the arousal
-# axis rather than falling silent.  No merge weight fixes that -- do not reach for this dial when
-# a shriek or a groan fails to appear.
 
 # ---------------------------------------------------------------- generation modes
 # THE THREE LEVERS.  Until now this server had exactly one way to shape a performance:
@@ -571,11 +559,6 @@ BURST_LAM_INTENSE = float(os.environ.get("MOSS_BURST_LAM_INTENSE", "0.5"))
 # any of its results, and every figure in it is one model judging another model's
 # output.  `auto` and the rest stay one environment variable away:
 #     MOSS_GEN_MODE=auto|adapter+steer|adapter+cfg|steer|cfg
-# Rollback confirmed 2026-08-31, and the reason is now written down where a proposer will hit it:
-# the WikiSkill index still recommends a `steer` mode for most of the 40 emotions, so the tables
-# someone reads to pick a recipe disagree with this default.  docs/MEASURED_2026-08-31.md §1
-# supersedes them.  Where steering was an attribute's only usable operating point, the honest
-# reading is "no measured lever for this attribute", not "use steering anyway".
 GEN_MODE = os.environ.get("MOSS_GEN_MODE", "adapter")
 # Both levers are individually killable, and with either off the modes that need it degrade
 # to `adapter` and say so in the response payload rather than reporting a mode that is not
@@ -642,23 +625,7 @@ NUMBNESS_SUBTRACTION = os.environ.get("MOSS_NUMBNESS", "with_steer")
 # value.  Below 1 guidance actively hurts (-0.0370 at g = 0.5, t -2.56).
 CFG_G = {"emo": 3.0, "vn": 2.5, "qual": 2.5}
 CFG_G_MIN = float(os.environ.get("MOSS_CFG_G_MIN", "1.5"))
-# RAISED 3.0 -> 4.0.  This is the change in PR #6, folded in here because the evidence for it has
-# since doubled.  PR #6 rested on one listener (FIELD_NOTES.md: "fine up to about 4.0, above that
-# it degenerates"), against an old bound that was never measured either -- 3.0 was simply the
-# largest family default, reused as a ceiling.  The gap mattered: levers.py clamps the resolved
-# value here, so a director asking for 4 silently got 3 and the range the report calls good was
-# unreachable through the automatic path.
-#
-# The crossfade study then measured guidance from a completely different direction and agreed.
-# Separation between two intended emotions rises monotonically with g -- 0.797 / 1.013 / 1.934 /
-# 2.239 SD at g = 0/2/3/4, with 11/14/18/23 of 30 texts clearing 1 SD and no reversal anywhere in
-# the grid.  Guidance does not merely raise an emotion score; it makes two emotions more
-# DISTINGUISHABLE from each other.  See docs/MEASURED_2026-08-31.md §2.
-#
-# The family defaults in CFG_G are deliberately unchanged: the evidence says 4.0 is the top of the
-# usable range, not that the defaults are too low.  Cost stays 1.90-1.94x and is the same at every
-# g -- the price is the second branch, not the strength.
-CFG_G_MAX = float(os.environ.get("MOSS_CFG_G_MAX", "4.0"))
+CFG_G_MAX = float(os.environ.get("MOSS_CFG_G_MAX", "3.0"))
 # Measured at batch 1: 1.89-1.94x over four cells, sd 0.053.  The intuition that only the
 # semantic transformer doubles is wrong -- the local transformer doubles too, running twelve
 # times per frame per branch, and the codec decode, the only genuinely shared component, is
@@ -688,3 +655,75 @@ DELIVERY_LEVER = os.environ.get("MOSS_DELIVERY_LEVER", "adapter")
 WIKI_COEFFICIENTS = os.environ.get(
     "MOSS_WIKI_COEFFICIENTS",
     "/mnt/nvme/moss-15-v2-assets/wikiskills/coefficients.json")
+
+# ---------------------------------------------------------------- end-trimming
+# Forced alignment against the script, used to fade in at the first word and to
+# cut after the last one.  This is the only fix that can work: the model spends
+# the duration it is given rather than overrunning it, so the filler sits INSIDE
+# the requested length and no clock-based cut can find it (EXPERIMENTS.md §8).
+#
+# LICENCE: the aligner is CC BY-NC 4.0, unlike the rest of this stack.  It is
+# fetched at runtime, not redistributed, but a commercial deployment has to turn
+# this off or swap the model.
+ALIGN_DIR = os.environ.get("MOSS_ALIGN_DIR", "/mnt/nvme/moss-15-v2-assets/aligner")
+ALIGN_DEVICE = os.environ.get("MOSS_ALIGN_DEVICE", "cuda")
+ALIGN_ON = os.environ.get("MOSS_ALIGN", "1") not in ("0", "false", "")
+# Below this alignment confidence the words were probably not found where the
+# aligner thinks they were, and nothing is cut.  Refusing to edit is always the
+# safe failure here: a wrong cut removes speech the director asked for.
+ALIGN_MIN_SCORE = float(os.environ.get("MOSS_ALIGN_MIN_SCORE", "0.35"))
+# Lead-in: only bother when there is more than this much before the first word.
+ALIGN_LEAD_MIN_S = float(os.environ.get("MOSS_ALIGN_LEAD_MIN", "0.12"))
+ALIGN_LEAD_RAMP_S = float(os.environ.get("MOSS_ALIGN_LEAD_RAMP", "0.10"))
+# Tail: keep a little air after the last word, then ramp down over the rest.
+ALIGN_TAIL_PAD_S = float(os.environ.get("MOSS_ALIGN_TAIL_PAD", "0.12"))
+ALIGN_TAIL_RAMP_S = float(os.environ.get("MOSS_ALIGN_TAIL_RAMP", "0.15"))
+# Do not cut unless there is at least this much audio after the last word, or
+# every take loses its natural decay for nothing.
+ALIGN_TAIL_MIN_S = float(os.environ.get("MOSS_ALIGN_TAIL_MIN", "0.25"))
+# Streaming: how far behind generation the player runs, so there is room to cut
+# before the filler is audible, and how much new audio between alignment passes.
+ALIGN_LOOKAHEAD_S = float(os.environ.get("MOSS_ALIGN_LOOKAHEAD", "0.5"))
+ALIGN_EVERY_S = float(os.environ.get("MOSS_ALIGN_EVERY", "0.5"))
+
+# ------------------------------------------------------- preference adapters
+# Both repositories publish their recommended checkpoint at the root, not their
+# final one, and both argue against the final in their own cards:
+#
+#   quality_dpo      root == step376.  The preference task is solved there
+#                    (accuracy 1.0000); every later step only inflates the
+#                    reward margin -- about 1 nat per token of drift away from
+#                    the reference model for no measured gain.  step1504 is
+#                    fetched alongside as `quality_dpo_step1504` so the two can
+#                    be compared by ear, which nobody has done.
+#   burst_stop_dpo   root == step896, and the card says "use 896, not final":
+#                    step902 is a 6-step tail and the only late reversal.
+#
+# burst_stop is the one whose evidence points at this server's open complaints:
+# on 317 held-out pairs pooled accuracy 0.707 -> 0.943, and the checkpoint it
+# started from scored 0.258 on two-sentence stops -- below chance, i.e. it
+# actively preferred the take that keeps talking.  Off by default all the same,
+# because nobody has heard it.
+QDPO_LORAS = {
+    "sft3_qdpo:quality_dpo":    float(os.environ.get("MOSS_LAM_QDPO", "1.0")),
+    "sft3_qdpo:burst_stop_dpo": float(os.environ.get("MOSS_LAM_BSDPO", "0.0")),
+    "sft3_qdpo:quality_dpo_step1504": 0.0,
+}
+QDPO_LABELS = {
+    "sft3_qdpo:quality_dpo": "Quality DPO (step376)",
+    "sft3_qdpo:burst_stop_dpo": "Burst + stop DPO (step896)",
+    "sft3_qdpo:quality_dpo_step1504": "Quality DPO (step1504, not recommended)",
+}
+# A scripted burst after the last word gets its stated length times this before
+# the cut point, because the model rarely realises a burst at exactly the length
+# asked for and cutting one off is worse than keeping a little filler.
+ALIGN_BURST_SLACK = float(os.environ.get("MOSS_ALIGN_BURST_SLACK", "2.0"))
+# Streaming lead-in: how much audio to hold before deciding where the first word
+# starts, and how many opening words to ask the aligner about.  Costs this much
+# once, at the start of a reply, and only when trimming is on.
+ALIGN_LEAD_SCAN_S = float(os.environ.get("MOSS_ALIGN_LEAD_SCAN", "1.3"))
+ALIGN_LEAD_WORDS = int(os.environ.get("MOSS_ALIGN_LEAD_WORDS", "3"))
+# Fraction of the requested duration that must exist before the tail is looked
+# for at all.  Below this, an alignment against the prefix reports the last word
+# as finished while half the line is unspoken.
+ALIGN_TAIL_AFTER = float(os.environ.get("MOSS_ALIGN_TAIL_AFTER", "0.6"))

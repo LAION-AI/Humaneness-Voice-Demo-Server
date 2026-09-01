@@ -16,5 +16,10 @@ pyarrow==25.0.1
 pandas==3.0.5
 audiostretchy==1.3.5
 speechbrain==1.1.0
+# forced alignment for end-trimming.  onnxruntime-gpu 1.22 is deliberate: 1.29
+# requires CUDA 13 and this stack is on 12.4, so it silently falls back to CPU,
+# which is 20x slower and cannot keep a stream fed.  It finds cuDNN and cuBLAS
+# because torch has already loaded them -- hence the load order in app.py.
+onnxruntime-gpu==1.22.0
 requests==2.34.2
 # ffmpeg must be on PATH (mp3 decode for the reference corpus)

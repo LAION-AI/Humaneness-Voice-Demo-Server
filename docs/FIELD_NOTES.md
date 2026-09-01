@@ -37,6 +37,28 @@ way, and a listener described the result as *more emotional, with strange
 artefacts, and the timbre off*. Rolled back to `adapter`, which is the shipped
 default. The lever is still there and still one environment variable away.
 
+## The vocal-burst dose — answered, and the answer is "leave it"
+
+**Superseded by measurement.** The dose was swept: ten weights, 2,420 cells under
+this exact stack (`MEASURED_2026-08-31.md`). No weight beats the shipped 0.25 /
+0.5 on the pre-registered metric, and switching the adapter off is significantly
+worse (−0.061, t −2.32). So the carried-over values were a lucky guess rather
+than a wrong one, and they stay.
+
+The caveat points the other way and is worth keeping in view: on plain hit-rate
+the dose *does* move, +0.061 at 0.5 rising to +0.091 at 1.5 — but with its
+maximum at the **top of the swept range**, which is an edge and not an optimum.
+A forced-choice listening test at 0.5 / 1.0 / 1.5 would settle it.
+
+**What outranks the dose entirely:** three of six tested burst classes essentially
+never realise at any weight — `frustrated_groan` 0 of 1188 prompted cues,
+`shriek` 11 of 1045. The model substitutes reliably *down the arousal axis*
+(frustrated groan → contented sigh, 127×). No merge weight lifts a floor of zero.
+When a shriek fails to appear, this dial is not the fix; the burst+stop
+preference adapter might be, and it is now available behind a checkbox.
+
+### The original entry, for the record
+
 ## The vocal-burst dose is an open question
 
 The burst adapters merge at **0.25** inline and **0.5** when a burst stands as
@@ -112,7 +134,22 @@ actually moved this: 5.5 frames per word produced 2.2 invented words per take,
 rare enough, tightening to 3.5 is one config line and no new machinery. It costs
 speech that is slightly faster.
 
-### An honest ordering
+### What was actually built
+
+(4) and (1). The rate was tightened to 4.0 frames per word with no closing pause
+(`EXPERIMENTS.md` §8), and the content-based trim is now implemented with forced
+alignment for both edges, streaming and offline — see
+[`ALIGNMENT.md`](ALIGNMENT.md). Measured over 36 takes it removes 86 % of the
+invented words and lowers word error rather than raising it, so it is not eating
+real speech.
+
+(3), the streaming detector, turned out not to need a separate detector: the same
+aligner runs on the audio generated so far, every 0.5 s, at 50 ms per pass on
+CUDA. What it did need was two guards that the offline path does not — a longer
+first look for the lead-in, and a refusal to look for the tail before most of the
+requested duration exists. Both were bugs before they were guards.
+
+### The original ordering, for the record
 
 (4) then (1). (4) is free and already understood; (1) is a bounded piece of work
 on top of tested code and would settle the offline case completely. (3) is the

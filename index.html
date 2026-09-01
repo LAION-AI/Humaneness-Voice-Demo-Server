@@ -242,6 +242,16 @@
       <input type="checkbox" id="pure"> Pure <i>(Basis + Referenz)</i></label>
     <label title="Die Regieanweisungen waehlen per Retrieval einen Emotions-Adapter, gemergt mit dem publizierten Wert 1.5. Aus: nur SFT3-Basis + abgerufener Referenzclip.">
       <input type="checkbox" id="emonuance" checked> Emotions-Nuancen <i>(Adapter @1.5)</i></label>
+    <label title="Forced Alignment gegen das Skript: einblenden bis zum ersten Wort, nach dem letzten Wort ausblenden und abschneiden. Beginnt das Skript mit einem Vocal Burst, bleibt der Anfang unberuehrt.">
+      <input type="checkbox" id="align" checked> Ende beschneiden <i>(Alignment)</i></label>
+    <label title="Preference-Adapter step376. Die Praeferenzaufgabe ist dort geloest; spaetere Schritte vergroessern nur die Marge. Von niemandem gehoert.">
+      <input type="checkbox" id="qdpo" checked> Quality-DPO
+      <input id="qdpos" type="range" min="0" max="2" step="0.05" value="1.0"
+             style="width:70px"><b id="qdposv">1.00</b></label>
+    <label title="Preference-Adapter step896: trainiert auf das Realisieren des angeforderten Vocal Bursts UND auf Aufhoeren statt Weiterbrabbeln. 317 Paare, gepoolt 0.707 -> 0.943. Von niemandem gehoert, daher aus.">
+      <input type="checkbox" id="bsdpo"> Burst+Stop-DPO
+      <input id="bsdpos" type="range" min="0" max="2" step="0.05" value="1.0"
+             style="width:70px"><b id="bsdposv">1.00</b></label>
     <label title="Classifier-free guidance: der Satz wird zweimal gerechnet, einmal mit und einmal ohne Regieanweisung, und der Unterschied wird verstaerkt. Kostet ~1.9x Rechenzeit und streamt deshalb nicht.">
       <input type="checkbox" id="cfg"> CFG <i>(Guidance)</i></label>
     <label title="Wie stark der Unterschied zwischen beiden Zweigen verstaerkt wird. 1.0 = aus.">
@@ -252,7 +262,7 @@
       <input type="checkbox" id="cfgsweep"> CFG-Sweep <i>(mehrere Faktoren)</i></label>
     <label title="Komma-getrennte CFG-Faktoren fuer den Sweep.">
       Sweep-Werte
-      <input id="cfgvals" type="text" value="1.0, 2.0, 3.0, 4.0"
+      <input id="cfgvals" type="text" value="1.0, 1.5, 2.0, 3.0"
              style="width:110px;background:var(--panel2);border:1px solid var(--line);
                     color:var(--fg);border-radius:6px;padding:2px 6px;font:12px var(--mono)"></label>
     <label title="Charakter-Adapter dieser Stimme dazu. Trainiert gegen die ungetunten v2-Gewichte, auf dem SFT+DPO-Checkpoint also off-distribution.">
@@ -521,6 +531,12 @@ async function send(){
 
                             stop_bias: parseFloat($('stopb').value),
                             gen_mode: $('cfg').checked ? 'adapter+cfg' : 'adapter',
+                            align: $('align').checked,
+                            qdpo_lams: {
+                              'sft3_qdpo:quality_dpo':
+                                  $('qdpo').checked ? parseFloat($('qdpos').value) : 0,
+                              'sft3_qdpo:burst_stop_dpo':
+                                  $('bsdpo').checked ? parseFloat($('bsdpos').value) : 0},
                             guidance: parseFloat($('cfgs').value),
                             ...(()=>{ const q=adpPayload();
                                  // the Aesthetics slider is the same adapter the
@@ -637,7 +653,7 @@ $('send').onclick = send;
 $('vol').addEventListener('input', e=>{ if(gain) gain.gain.value = parseFloat(e.target.value); });
 const dial = (id,out)=>{ const f=()=> $(out).textContent = parseFloat($(id).value).toFixed(2);
                          $(id).addEventListener('input', f); f(); };
-dial('spk','spkv'); dial('aes','aesv'); dial('stopb','stopbv'); dial('plam','plamv'); dial('cfgs','cfgsv');
+dial('spk','spkv'); dial('aes','aesv'); dial('stopb','stopbv'); dial('plam','plamv'); dial('cfgs','cfgsv'); dial('qdpos','qdposv'); dial('bsdpos','bsdposv');
 $('sweepbtn').onclick = runSweep;
 // the ten speaker profiles, each with its own anchor recording and adapter
 fetch('/api/state').then(r=>r.json()).then(s=>{

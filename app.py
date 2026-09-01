@@ -19,6 +19,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 import config
 import levers
 import lora_bank
+import align_engine
 import steer_engine
 import timed_script
 from llm_agent import VOICE_TOOL, LLMAgent
@@ -124,6 +125,14 @@ def _boot():
             _p["has_conditions"] = _p["has_conditions"] or bank.has_matrix(_v)
         print(f"[profiles] {len(STATE['profiles'])} voice profiles available",
               flush=True)
+        try:
+            # after the TTS model, so torch has already pulled cuDNN and cuBLAS
+            # into the process -- onnxruntime finds them there and takes the CUDA
+            # provider.  Loaded before torch it silently falls back to CPU, which
+            # is 20x slower and too slow to keep a stream fed.
+            STATE["aligner"] = align_engine.Aligner()
+        except Exception as e:
+            print(f"[align] unavailable: {e}", flush=True)
         try:
             STATE["retriever"] = retrieval.Retriever(device=str(tts.device))
         except Exception as e:
@@ -323,6 +332,12 @@ def adapters():
                            "default": config.QUALITY_LORAS.get(n, 0.0), "max": 2.0}
                           for n in sorted(config.QUALITY_LORAS)
                           if n in lb.repos]})
+    out.append({"kind": "sft3_qdpo", "title": "Preference adapters",
+                "note": "Quality DPO is on at 1.0; burst+stop is off until "
+                        "somebody has listened to it. Neither has been heard.",
+                "items": [{"name": n, "label": config.QDPO_LABELS.get(n, n),
+                           "default": config.QDPO_LORAS.get(n, 0.0), "max": 2.0}
+                          for n in config.QDPO_LORAS if n in lb.repos]})
     out.append({"kind": "sft3_voicenet", "title": "Delivery axes",
                 "note": "The director picks up to two of these itself. A slider "
                         "forces one on regardless.",
@@ -393,6 +408,13 @@ async def say(req: Request):
                 meta.update(payload)
     await asyncio.get_running_loop().run_in_executor(None, run)
     w = np.concatenate(chunks) if chunks else np.zeros(1, np.float32)
+    if b.get("align") and STATE.get("aligner") is not None:
+        # offline the whole take is in hand, so one alignment pass settles both
+        # edges exactly; no lookahead and no repeated passes
+        w, rep = align_engine.trim(w, tts.sr, b.get("text", ""),
+                                   b.get("plain") or b.get("text", ""),
+                                   STATE["aligner"])
+        meta["align"] = rep
     pcm = np.clip(w * 32767, -32768, 32767).astype("<i2").tobytes()
     return {"sr": tts.sr, "pcm": base64.b64encode(pcm).decode(), **meta}
 
@@ -473,8 +495,13 @@ async def cfg_sweep(req: Request):
             out.append({"guidance": g, "error": str(e)[:200]})
             continue
         w = np.concatenate(chunks) if chunks else np.zeros(1, np.float32)
+        arep = None
+        if b.get("align", config.ALIGN_ON) is not False \
+                and STATE.get("aligner") is not None:
+            w, arep = align_engine.trim(w, tts.sr, tagged, plain, STATE["aligner"])
         pcm = np.clip(w * 32767, -32768, 32767).astype("<i2").tobytes()
-        out.append({"guidance": g, "pcm": base64.b64encode(pcm).decode(),
+        out.append({"guidance": g, "align": arep,
+                    "pcm": base64.b64encode(pcm).decode(),
                     "sec": round(len(w) / tts.sr, 3),
                     "ms": round((time.time() - t0) * 1000, 1),
                     "rtf": meta.get("rtf")})
@@ -710,6 +737,19 @@ async def turn(req: Request):
                     lam = dflt
                 if lam > 0.001 and nm in lb.repos:
                     q_spec.append((nm, lam))
+        # preference-tuned adapters: each has its own checkbox and slider, and a
+        # weight of 0 means the adapter is simply not loaded
+        qd_spec = []
+        if lb:
+            ql = body.get("qdpo_lams") or {}
+            for nm, dflt in config.QDPO_LORAS.items():
+                lam = ql.get(nm, ql.get(nm.split(":")[-1], dflt))
+                try:
+                    lam = float(lam)
+                except (TypeError, ValueError):
+                    lam = dflt
+                if lam > 0.001 and nm in lb.repos:
+                    qd_spec.append((nm, lam))
         vn_spec = []
         if lb and body.get("delivery_loras", True) is not False:
             seen_vn = set()
@@ -767,7 +807,7 @@ async def turn(req: Request):
                 lam = config.PURE_PROFILE_LAM if lam is None else float(lam)
                 if prof and prof["lora"] in lb.repos and lam > 0.001:
                     specs = [(prof["lora"], lam)]
-            specs = dpo_spec + q_spec + specs + vn_spec + emo_spec
+            specs = dpo_spec + q_spec + qd_spec + specs + vn_spec + emo_spec
         elif lb:
             try:
                 mix = out.get("blend")
@@ -834,6 +874,9 @@ async def turn(req: Request):
             specs = head + [s for s in specs if s[0] not in picked]
             if dpo_spec:
                 specs = dpo_spec + [x for x in specs if x[0] != config.SFT3_DPO_LORA]
+            if qd_spec:
+                picked_qd = {n for n, _ in qd_spec}
+                specs = [x for x in specs if x[0] not in picked_qd] + qd_spec
             if q_spec:
                 picked_q = {n for n, _ in q_spec}
                 specs = [x for x in specs if x[0] not in picked_q] + q_spec
@@ -965,6 +1008,23 @@ async def turn(req: Request):
         vc_st = vc.new_stream(tts.sr or 48000) if vc is not None else None
         take = []          # kept only to score speaker similarity at the end
 
+        # End-trimming: fade in at the first scripted word, cut after the last.
+        # The guard holds a lookahead so there is room to cut before the filler
+        # would be audible; with the aligner missing or the box unticked it stays
+        # None and this path is exactly what it was.
+        guard = None
+        if body.get("align", config.ALIGN_ON) is not False \
+                and STATE.get("aligner") is not None and STATE["aligner"].ok \
+                and config.TIMED_SCRIPT:
+            try:
+                _tg, _fr, _pl = timed_script.render(out["script"], speed=speed)
+                if _pl:
+                    guard = align_engine.StreamGuard(
+                        STATE["aligner"], tts.sr, _tg, _pl, enabled=True,
+                        expect_s=_fr / config.FRAME_RATE)
+            except Exception as e:
+                print(f"[align] guard not built: {e}", flush=True)
+
         # If the client goes away mid-reply — tab closed, connection dropped — the
         # producer thread would otherwise block forever handing the next chunk to
         # a queue nobody drains, and it holds the generation lock while it does,
@@ -1011,6 +1071,10 @@ async def turn(req: Request):
                         None, vc.convert_chunk, payload, vc_st)
                     if payload is None or not payload.size:
                         continue
+                if guard is not None:
+                    payload = await loop.run_in_executor(None, guard.feed, payload)
+                    if payload is None or not payload.size:
+                        continue
                 take.append(payload)
                 yield _pcm(payload)
             elif kind == "start":
@@ -1020,6 +1084,19 @@ async def turn(req: Request):
                 payload["type"] = "start"
                 yield _ev(payload)
             elif kind == "end":
+                if guard is not None:
+                    tail = guard.flush()
+                    if tail is not None and tail.size:
+                        take.append(tail)
+                        yield _pcm(tail)
+                    payload = dict(payload)
+                    payload["align"] = guard.report
+                    if guard.report.get("applied"):
+                        r = guard.report
+                        print(f"[align] lead={r.get('lead_s')} cut={r.get('cut_s')} "
+                              f"removed={r.get('removed_s')}s "
+                              f"checks={r.get('checks')}", flush=True)
+
                 if vc is not None:                 # emit the held-back seam
                     tailp = vc.flush(vc_st)
                     if tailp.size:
