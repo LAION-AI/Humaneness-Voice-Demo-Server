@@ -62,10 +62,24 @@ def _norm(v):
 
 
 def gate(wer, knee=None):
-    """Inverse word error rate, flattened above the knee."""
-    k = config.BON_WER_KNEE if knee is None else knee
+    """The intelligibility factor: the inverse word error rate, straight.
+
+    This was flattened to 1.0 above an inverse rate of 0.85, on the argument that
+    intelligibility is a threshold rather than a preference.  Removed: the flat
+    region covered most of a candidate set -- six of eight in one run -- so the
+    factor stopped separating exactly where the candidates were closest, and the
+    ranking there fell to the three perceptual terms alone.  Multiplying by the
+    raw inverse rate keeps a small intelligibility difference as a small reward
+    difference all the way up.
+
+    `knee` is still honoured when passed, so the old behaviour is one argument
+    away, but nothing sets it now.
+    """
     inv = 1.0 - float(max(0.0, min(1.0, wer)))
-    return 1.0 if inv > k else inv
+    k = config.BON_WER_KNEE if knee is None else knee
+    if k is not None and k > 0 and inv > k:
+        return 1.0
+    return inv
 
 
 def rank(cands):

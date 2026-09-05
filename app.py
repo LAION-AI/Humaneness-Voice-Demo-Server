@@ -571,9 +571,14 @@ async def say_batch(req: Request):
             ref.append(a)
     items = []
     for it in b.get("items") or []:
-        items.append({"text": it["text"], "instruction": it.get("instruction", ""),
-                      "language": it.get("language", "English"),
-                      "tokens": int(it["tokens"]), "ref_codes": ref or None})
+        one = {"text": it["text"], "instruction": it.get("instruction", ""),
+               "language": it.get("language", "English"),
+               "tokens": int(it["tokens"]), "ref_codes": ref or None}
+        # the neutralised half, when the caller wants guidance
+        if it.get("instruction_unc"):
+            one["instruction_unc"] = it["instruction_unc"]
+            one["text_unc"] = it.get("text_unc") or it["text"]
+        items.append(one)
     if not items:
         return JSONResponse({"error": "no items"}, status_code=400)
     t0 = time.time()
@@ -581,6 +586,7 @@ async def say_batch(req: Request):
         None, lambda: tts.generate_batch(
             items, lora_specs=b.get("loras"), seed=b.get("seed"),
             audio_temperature=b.get("audio_temperature"),
+            guidance=b.get("guidance"),
             stop_bias=b.get("stop_bias")))
     out = []
     for w in waves:

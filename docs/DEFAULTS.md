@@ -117,7 +117,7 @@ environment variable too, so nothing here needs a code edit to change.
 | `BON_GUIDANCE` | `3.0` |
 | `BON_N` | `8` |
 | `BON_ON` | `False` |
-| `BON_WER_KNEE` | `0.85` |
+| `BON_WER_KNEE` | `0.0` |
 | `BURST_LAM` | `0.25` |
 | `BURST_LAM_BUDGET` | `3.0` |
 | `BURST_LAM_INTENSE` | `0.5` |
@@ -134,7 +134,7 @@ environment variable too, so nothing here needs a code edit to change.
 | `CONTINUITY` | `the same speaker continues without interruption: identical voice, identical person, same microphone and same room.` |
 | `DELIVERY_LEVER` | `adapter` |
 | `EIV_DIR` | `/mnt/nvme/empathic-insights-voice-small` |
-| `EMOTION_NAMES` | `{'Longing', 'Elation', 'Malevolence_Malice', 'Pride', 'Affection', 'Impatience_and_Irritability', 'Emotional_Numbness', 'Pleasure_Ecstasy', 'Teasing', 'Intoxication_Altered_States_of_Consciousness', ' …` |
+| `EMOTION_NAMES` | `{'Disappointment', 'Malevolence_Malice', 'Embarrassment', 'Elation', 'Sadness', 'Pride', 'Pleasure_Ecstasy', 'Concentration', 'Contentment', 'Doubt', 'Awe', 'Sourness', 'Intoxication_Altered_States_of …` |
 | `GEN_MODE` | `adapter` |
 | `HISTORY_TURNS_LOCAL` | `8` |
 | `HISTORY_TURNS_LUNA` | `40` |

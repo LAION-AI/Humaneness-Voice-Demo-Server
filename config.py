@@ -850,8 +850,10 @@ BON_GUIDANCE = float(os.environ.get("MOSS_BON_GUIDANCE", "3.0"))
 # because the other two terms measure whether a take is good at all rather than
 # whether it is the right one.
 BON_CLAP_WEIGHT = float(os.environ.get("MOSS_BON_CLAP_W", "2.0"))
-# Above this inverse word error rate the gate is 1.0: intelligibility is a
-# threshold, not a preference.  Below it, a garbled take loses however good it
-# sounds.
-BON_WER_KNEE = float(os.environ.get("MOSS_BON_WER_KNEE", "0.85"))
+# The intelligibility factor is the raw inverse word error rate.  It used to be
+# flattened to 1.0 above 0.85, which covered most of a candidate set -- six of
+# eight in one run -- so the factor stopped separating precisely where the
+# candidates were closest.  0 disables the flattening; set it to 0.85 to get the
+# old behaviour back.
+BON_WER_KNEE = float(os.environ.get("MOSS_BON_WER_KNEE", "0"))
 BON_DEVICE = os.environ.get("MOSS_BON_DEVICE", "cuda:0")
