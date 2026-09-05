@@ -28,6 +28,8 @@ Two pages ship in the server:
 | know exactly what the director is told, and why | [`docs/PROMPTING.md`](docs/PROMPTING.md) |
 * [`docs/BENCHMARK.md`](docs/BENCHMARK.md) — performing a JSON benchmark item, and the verbatim guarantee
 * [`docs/CONTEXT.md`](docs/CONTEXT.md) — the context window, the 400 it caused, and the guard
+* [`docs/ARENA.md`](docs/ARENA.md) — an evolutionary search for a better director prompt, and why it came back null
+* [`docs/ARENA_PROMPTS.md`](docs/ARENA_PROMPTS.md) — every prompt used in that search, verbatim
 | reproduce this configuration elsewhere | [`docs/API.md`](docs/API.md) §"Reproducing this server elsewhere", then [`docs/DEFAULTS.md`](docs/DEFAULTS.md) |
 | understand how adapters are loaded and weighted | [`docs/ADAPTERS.md`](docs/ADAPTERS.md) |
 | see what was measured, and what turned out to be wrong | [`docs/EXPERIMENTS.md`](docs/EXPERIMENTS.md), [`docs/LEARNINGS.md`](docs/LEARNINGS.md) |
