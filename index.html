@@ -242,6 +242,16 @@
       <input type="checkbox" id="pure"> Pure <i>(Basis + Referenz)</i></label>
     <label title="Die Regieanweisungen waehlen per Retrieval einen Emotions-Adapter, gemergt mit dem publizierten Wert 1.5. Aus: nur SFT3-Basis + abgerufener Referenzclip.">
       <input type="checkbox" id="emonuance" checked> Emotions-Nuancen <i>(Adapter @1.5)</i></label>
+    <label title="Welcher Adaptersatz die Bursts liefert. Vorgabe folgt pro Klasse dem, was ihr eigenes Rezept als besten Adapter misst; die festen Saetze dienen dem Vergleich.">
+      Burst-Adapter
+      <select id="burstset" style="background:var(--panel2);border:1px solid var(--line);
+              color:var(--fg);border-radius:6px;padding:2px 6px;font:12px inherit">
+        <option value="recipe" selected>nach Rezept (pro Klasse)</option>
+        <option value="shipped">shipped (71)</option>
+        <option value="v2">v2 pro Klasse (45)</option>
+        <option value="v2_top1">v2 top-1 (12)</option>
+        <option value="group">v2 pro Gruppe (20)</option>
+      </select></label>
     <label title="Gemessene Burst-Rezepte statt handgeschriebener Regeln: nur Klangklassen, die nachweislich realisieren, mit dem je Klasse gemessenen Merge-Gewicht, plus die gemessenen Platzierungs- und Formulierungsregeln. Aus = die alten Regeln.">
       <input type="checkbox" id="skills" checked> Neue Skills <i>(gemessene Bursts)</i></label>
     <label title="Forced Alignment gegen das Skript: einblenden bis zum ersten Wort, nach dem letzten Wort ausblenden und abschneiden. Beginnt das Skript mit einem Vocal Burst, bleibt der Anfang unberuehrt.">
@@ -535,6 +545,7 @@ async function send(){
                             gen_mode: $('cfg').checked ? 'adapter+cfg' : 'adapter',
                             align: $('align').checked,
                             skills: $('skills').checked,
+                            burst_set: $('burstset').value,
                             qdpo_lams: {
                               'sft3_qdpo:quality_dpo':
                                   $('qdpo').checked ? parseFloat($('qdpos').value) : 0,

@@ -360,6 +360,21 @@ def adapters():
                         f"it.",
                 "items": [{"name": f"sft3_emotion:{n}", "label": n.replace("_", " "),
                            "default": 0.0, "max": 2.0} for n in group("sft3_emotion")]})
+    for _k, _t, _n in (
+            ("burst_v2", "Burst adapters v2 — per class",
+             "The 105-adapter release. Which arm serves a class is decided by "
+             "that class's own recipe; these sliders force one regardless."),
+            ("burst_v2_top1", "Burst adapters v2 — per class, top-1", ""),
+            ("burst_grp", "Burst adapters v2 — per group", ""),
+            ("burst_grp25", "Burst adapters v2 — per group, dose 25", ""),
+            ("burst_abl", "Burst ablation arms (evidence, not for serving)", ""),
+            ("burst_dose", "Burst dose arms (evidence, not for serving)", "")):
+        _items = group(_k)
+        if _items:
+            out.append({"kind": _k, "title": _t, "note": _n,
+                        "items": [{"name": f"{_k}:{n}", "label": n.replace("_", " "),
+                                   "default": 0.0, "max": config.BURST_LAM_MAX}
+                                  for n in _items]})
     out.append({"kind": "burst", "title": "Vocal bursts",
                 "note": "Added automatically when the script contains one. With "
                         "skills on, at the weight measured for that class "
@@ -916,6 +931,19 @@ async def turn(req: Request):
                 import skills as _sk
                 _s = _sk.load()
                 if _s is not None and _s.ok:
+                    # which adapter set the automatic resolution draws from.
+                    # "recipe" asks each class's own page; anything else pins one
+                    # set for the whole turn so the two can be compared.
+                    _sel = str(body.get("burst_set") or config.BURST_SET)
+                    def _reroot(n):
+                        cls = n.split(":", 1)[-1]
+                        if _sel == "recipe":
+                            cand = _s.adapter_for(cls)
+                        else:
+                            cand = f"{config.BURST_SET_ROOT.get(_sel, 'burst')}:{cls}"
+                        return cand if cand in lb.repos else n
+                    specs = [((_reroot(n), l) if n.startswith("burst:") else (n, l))
+                             for n, l in specs]
                     _cap = config.BURST_LAM_MAX
 
                     def _burst_lam(name, flat):
@@ -923,8 +951,9 @@ async def turn(req: Request):
                         # class has no measured recipe, so the cap only ever bites
                         # on a measured weight.
                         return min(_s.weight_for(name.split(":", 1)[-1], flat), _cap)
+                    _isb = lambda n: n.split(":", 1)[0].startswith("burst")
 
-                    specs = [((n, _burst_lam(n, l)) if n.startswith("burst:")
+                    specs = [((n, _burst_lam(n, l)) if _isb(n)
                               else (n, l)) for n, l in specs]
             except Exception as e:
                 print(f"[skills] burst weights unchanged: {e}", flush=True)

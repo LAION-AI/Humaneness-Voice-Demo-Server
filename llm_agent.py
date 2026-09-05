@@ -246,6 +246,11 @@ its cues removed, so "script" must contain the complete line, exactly as you wan
      because the whole bracket is read as an instruction about how to speak. Write the two
      separately — "(clearly amused) ... (chuckle) ..." — and the chuckle becomes an actual sound
      with its own slot in the timing.
+   - EVERY BRACKET IS WRITTEN IN ENGLISH, even when you are speaking German. The spoken words
+     follow the user's language; the cues and burst labels inside the brackets do not. That is
+     how the training corpus is written — its German lines read "Das zerreisst einen einfach,
+     weisst du? (relief sigh)" — and a German cue is outside the distribution the voice model
+     learned, where it behaves unpredictably.
    - NEVER write a number inside a bracket. The timing is worked out for you and added afterwards,
      and in this format a round bracket that contains a number stops being a direction and becomes
      a vocal burst. "(quietly, 2 seconds)" would be performed as a sound, not as an instruction.

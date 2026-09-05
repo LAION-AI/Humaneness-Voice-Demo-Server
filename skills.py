@@ -81,6 +81,7 @@ class Skills:
         self._parse_main(md)
         self._parse_merge(md)
         self._parse_lists(md)
+        self._parse_arms()
         self.ok = bool(self.recipes)
         print(f"[skills] {len(self.recipes)} burst recipes, "
               f"{len(self.never)} classes that never realise, "
@@ -127,6 +128,64 @@ class Skills:
         if m:
             for cls, val in re.findall(r"`([a-z0-9_]+)`\s*\(([0-9.]+)\)", m.group(1)):
                 self.weak[cls] = float(val)
+
+    # Which adapter set each recipe names.  The `bester Adapter` row of a class
+    # page says whether the newly measured arm superseded the shipped one, and
+    # that decision is per class -- 12 of the merge table's rows moved, the rest
+    # stayed.  Serving one set for everything would override that judgement in
+    # one direction or the other, so the arm is read per class.
+    ARMS = {"bulk_mix_full": "burst_v2", "bulk_mix_top1": "burst_v2_top1",
+            "grp_mix_full": "burst_grp", "grp_mix25": "burst_grp25",
+            "shipped": "burst"}
+    # Two classes name an ablation arm as their best.  Those adapters are filed
+    # per arm rather than per class -- `ablation_d2_matched__scream` -- so they
+    # need the name as well as the root, which `root_for` alone cannot express.
+    ABL_ARMS = ("d2_matched", "d1_matched", "d2_full", "mix_full", "mix_matched",
+                "real")
+
+    def _parse_arms(self):
+        import glob as _g
+        pat = os.path.join(self.root, "patterns", "vb-*.md")
+        for f in _g.glob(pat):
+            cls = os.path.basename(f)[3:-3]
+            try:
+                txt = open(f, encoding="utf-8").read()
+            except Exception:
+                continue
+            m = re.search(r"\|\s*bester Adapter\s*\|([^|]*)\|", txt)
+            if not m:
+                continue
+            cell = m.group(1)
+            new = "neu" in cell.lower()
+            arm = None
+            for a in self.ARMS:
+                if f"`{a}`" in cell:
+                    arm = a
+                    break
+            abl = None
+            if arm is None and new:
+                for a in self.ABL_ARMS:
+                    if f"`{a}`" in cell:
+                        abl = a
+                        break
+            if cls in self.recipes:
+                self.recipes[cls]["arm"] = (self.ARMS.get(arm, "burst")
+                                            if (new and arm) else
+                                            ("burst_abl" if abl else "burst"))
+                if abl:
+                    self.recipes[cls]["adapter"] = f"ablation_{abl}__{cls}"
+
+    def root_for(self, burst_class, default="burst"):
+        """The adapter set this class's own recipe names."""
+        r = self.recipes.get(str(burst_class or "").lower())
+        return (r or {}).get("arm") or default
+
+    def adapter_for(self, burst_class):
+        """`root:name` for this class, when the recipe names a specific one."""
+        c = str(burst_class or "").lower()
+        r = self.recipes.get(c) or {}
+        root = r.get("arm") or "burst"
+        return f"{root}:{r.get('adapter') or c}"
 
     # ------------------------------------------------------------------ use
     def weight_for(self, burst_class, default=None):
@@ -178,6 +237,13 @@ class Skills:
                   "  " + ", ".join(gone)]
         L += ["",
               "HOW TO WRITE THEM — each of these was measured on this model:",
+              "  * WRITE EVERY CUE IN ENGLISH, even when the spoken line is "
+              "German. This is not a style preference: it is how the training "
+              "data is written. German corpus lines read "
+              "\"Das zerreisst einen einfach, weisst du? (relief sigh)\" — "
+              "German words, English cue. A German cue is out of distribution "
+              "and behaves unpredictably. The words you speak stay in the "
+              "user's language; only the brackets are English.",
               "  * Put the burst BETWEEN sentences, not inside one. Mid-clause "
               "placement is worse on 15 of 15 classes tested (hit rate -0.07 to "
               "-0.12, miss rate +0.31 to +0.37). The single exception is "

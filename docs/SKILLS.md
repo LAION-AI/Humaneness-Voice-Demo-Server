@@ -43,6 +43,45 @@ Beyond the list, five rules, each with the measurement behind it:
 The list itself is ordered by measured hit rate and split at 0.40, so the
 director reaches for the reliable sounds first.
 
+## The v2 adapter release, served per class
+
+The 105-adapter release adds five serving arms beside the original 71. Which arm
+serves a class is **not** a global setting: each class's own page names the arm
+that won for it, and the merge rule moved some while most stayed. Read from the
+pages at boot, that resolves to
+
+| arm | classes |
+|---|--:|
+| the original set | 35 |
+| `bulk_mix_full` (per class) | 12 |
+| `ablation_d2_matched` | 2 |
+| `bulk_mix_top1` | 1 |
+
+— which is the merge table's own count, and a useful check that the parser is
+reading what the study decided rather than what it would like.
+
+All 105 are registered as adapter sets regardless, so every one is addressable
+by name from the overlay and from `adapter_overrides`, including the ablation and
+dose arms that exist as evidence rather than for serving. 274 adapters across 17
+sets are now loadable.
+
+The selector in the page pins one set for a whole turn instead, which is what
+makes an A/B possible; `recipe` is the default and the only setting that follows
+the measurements.
+
+## Cue language
+
+Cues are written in **English even when the spoken line is German**. This is the
+corpus convention, not a preference: the German training lines read
+`Das zerreisst einen einfach, weisst du? (relief sigh)` — German words, English
+cue. A German cue is out of distribution.
+
+This is now in both the director prompt and the skills block. Observed
+afterwards: a German turn wrote `(exhausted groan)` for the burst — the rule
+taking effect — while its delivery cue stayed German. So the rule is followed
+for burst labels and only partly for directions, which is worth knowing before
+anyone reads a single German cue as evidence that it does not work.
+
 ## The switch
 
 Checkbox **Neue Skills** in the chat page, on by default; `MOSS_SKILLS=0` for the

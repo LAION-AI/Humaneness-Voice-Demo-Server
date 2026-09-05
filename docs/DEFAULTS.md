@@ -114,6 +114,9 @@ environment variable too, so nothing here needs a code edit to change.
 | `ASSETS` | `/mnt/nvme/moss-15-v2-assets/loras` |
 | `BURST_LAM` | `0.25` |
 | `BURST_LAM_INTENSE` | `0.5` |
+| `BURST_LAM_MAX` | `2.3` |
+| `BURST_SET` | `recipe` |
+| `BURST_SET_ROOT` | `{'shipped': 'burst', 'v2': 'burst_v2', 'v2_top1': 'burst_v2_top1', 'group': 'burst_grp'}` |
 | `CFG_COST_FACTOR` | `1.93` |
 | `CFG_ENABLED` | `True` |
 | `CFG_G` | `{'emo': 3.0, 'vn': 2.5, 'qual': 2.5}` |
@@ -123,7 +126,7 @@ environment variable too, so nothing here needs a code edit to change.
 | `CONTINUITY` | `the same speaker continues without interruption: identical voice, identical person, same microphone and same room.` |
 | `DELIVERY_LEVER` | `adapter` |
 | `EIV_DIR` | `/mnt/nvme/empathic-insights-voice-small` |
-| `EMOTION_NAMES` | `{'Sexual_Lust', 'Helplessness', 'Anger', 'Sadness', 'Impatience_and_Irritability', 'Teasing', 'Distress', 'Doubt', 'Fatigue_Exhaustion', 'Relief', 'Contempt', 'Infatuation', 'Longing', 'Intoxication_A …` |
+| `EMOTION_NAMES` | `{'Disgust', 'Malevolence_Malice', 'Longing', 'Embarrassment', 'Disappointment', 'Elation', 'Intoxication_Altered_States_of_Consciousness', 'Distress', 'Pain', 'Triumph', 'Pleasure_Ecstasy', 'Emotional …` |
 | `GEN_MODE` | `adapter` |
 | `HISTORY_TURNS_LOCAL` | `8` |
 | `HISTORY_TURNS_LUNA` | `40` |

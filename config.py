@@ -153,6 +153,15 @@ LORA_ROOTS = {
     # 0-11 AND text_lm_head -- 12 of its 23 modules are weight-tied, so all
     # twelve are hooked rather than merged (see docs/ADAPTERS.md).
     "sft3_qdpo":     "/mnt/nvme/moss-15-v2-assets/loras/sft3_qdpo",
+    # The v2 burst release: 105 adapters in six arms.  Registered so every one is
+    # addressable by name from the overlay and from `adapter_overrides`; which
+    # set the AUTOMATIC burst resolution uses is a separate switch, below.
+    "burst_v2":      "/mnt/nvme/moss-15-v2-assets/loras/_v2raw/per_class",
+    "burst_v2_top1": "/mnt/nvme/moss-15-v2-assets/loras/_v2raw/per_class_top1",
+    "burst_grp":     "/mnt/nvme/moss-15-v2-assets/loras/_v2raw/groups_full",
+    "burst_grp25":   "/mnt/nvme/moss-15-v2-assets/loras/_v2raw/groups_dose25",
+    "burst_abl":     "/mnt/nvme/moss-15-v2-assets/loras/_v2raw/ablation",
+    "burst_dose":    "/mnt/nvme/moss-15-v2-assets/loras/_v2raw/dose",
     "sports":    _snap("laion/moss-sports-commentator-lora"),
     # the anchor speaker as a trained adapter — the direct route to a consistent
     # voice, as opposed to converting after the fact
@@ -776,3 +785,13 @@ SKILLS_ON = os.environ.get("MOSS_SKILLS", "1") not in ("0", "false", "")
 # study's own shipping bar; under it a request is more likely to produce nothing
 # than the sound asked for.
 SKILLS_MIN_HIT = float(os.environ.get("MOSS_SKILLS_MIN_HIT", "0.15"))
+
+# ------------------------------------------------------- which burst adapters
+# `recipe` is the default and the only setting that follows the measurements:
+# each class's own page names the arm that won for it, and the merge rule moved
+# 12 of them while the rest stayed on the shipped adapter.  Serving one set for
+# everything would override that per-class judgement in one direction or the
+# other.  The fixed sets remain selectable for comparison.
+BURST_SET = os.environ.get("MOSS_BURST_SET", "recipe")
+BURST_SET_ROOT = {"shipped": "burst", "v2": "burst_v2",
+                  "v2_top1": "burst_v2_top1", "group": "burst_grp"}   # "recipe" -> per class
