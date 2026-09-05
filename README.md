@@ -473,8 +473,22 @@ things in it are worth knowing before you rely on a row:
   at 6.2 % and `heavy_breathing` at 12.0 % on real speech, so those classes cannot *exhibit* a
   higher rate however good the adapter is. Such rows are carried at family level with the
   reason printed rather than dropped.
-- **Nine burst classes reach a strict hit rate of 0.15 or better; 21 do at group level.** The
-  rest are honest negatives — for several of them, nothing tried so far works at all.
+- **There is a page for every burst label a caller can plausibly ask for** — 117 of them,
+  the union of the requested classes, the detector's emittable labels and the grouping
+  vocabulary. 24 carry a working recipe at group level, 11 are weak, 10 do not work at
+  all, and 72 were not measured individually and point at the measured sibling in their
+  group with that sibling's actual number. **A page for a class that does not work is the
+  most useful page in the set** — it stops someone spending a day on it.
+- **Borrowing beats retraining.** Loading a group's strongest member adapter for every
+  member (`bestmem`) beats the shipped adapter by +0.0762 (t +3.76) and a per-class
+  retrain by +0.0357 (t +2.32), at zero training cost. Training one adapter on a group's
+  pooled rows is *worse* than training on the class's own rows (mean −0.090; better on 6
+  classes, worse on 18), and combining several member adapters at a fixed weight budget
+  is worse still (0 of 120 per-class wins). Both dead ends are written into the pages
+  with their numbers so nobody re-derives them.
+- **No recipe names w = 2.0.** Across the 28 classes of the two-source groups every
+  adapter arm breaks the WER gate there (+0.109 to +0.168 against a +0.104 bound). Every
+  arm holds to w = 1.5.
 
 `wikiskills_legacy/` is the pre-revision snapshot. Exactly 33 of 101 files differ between the
 two trees, all of them vocal-burst pages; emotions, VoiceNet dimensions, `interactions.md` and

@@ -245,3 +245,95 @@ Zwei Klassen tragen den Effekt sichtbar: `surprised_gasp` (+0,367 streng, t +3,5
 **Hörproben zu jeder Zeile dieser Tabelle**: `~/reports/bericht_vokale_bursts.html` — 1.905 Takes, pro Szene der Take ohne Adapter zuerst und die drei Stärken nebeneinander.
 
 <!-- /vb_cls2:sec64 -->
+
+<!-- vb_grp:2026-09-05 -->
+
+## Nachtrag 2026-09-05 — geliehene Adapter, zwei Sackgassen, und eine Obergrenze für w
+
+> Studie `vb_grp`. Alles hier ist auf dem Trägersatz der Grundform gemessen, gepaart auf
+> Prompt-Ebene, Startwert allein vom Prompt-Index abhängig. Gruppen-Schema `vm_groups.py`
+> md5 `f83e3850` (23 Gruppen, 117 Mitgliedsnamen).
+
+### 1. Einen Adapter aus der Gruppe leihen — die brauchbarste Neuerung
+
+Den Adapter des **stärksten gemessenen Mitglieds** einer Gruppe für **alle** Mitglieder zu laden
+schlägt beides, was bisher da war, und kostet keine GPU-Stunde:
+
+| Vergleich | Form | w | d | t | n |
+|---|---|--:|--:|--:|--:|
+| geliehen − ausgeliefert | inline | 1,50 | **+0,0762** | **+3,76** | 280 |
+| geliehen − nachtrainiert | inline | 1,00 | **+0,0357** | **+2,32** | 280 |
+
+Gemessen über die 28 Klassen der zehn zweiquelligen Gruppen, Produktionsdetektor, Gruppenebene.
+Für eine Klasse, deren eigener Adapter schwach ist, deren Gruppe aber ein starkes Mitglied hat,
+ist das jetzt das empfohlene Vorgehen. Welchen Adapter man leiht, steht auf jeder Klassenseite.
+
+Klassen, für die eine geliehene Einstellung derzeit die beste gemessene Zelle ist (5):
+`childlike_giggle`, `breathy_giggle`, `chuckle`, `displeased_grunt`, `heavy_breathing`.
+
+### 2. Zwei Sackgassen, mit Zahlen, damit sie niemand noch einmal ableitet
+
+**Gepoolte Gruppen-Adapter** — ein Adapter pro Gruppe, trainiert auf den zusammengeworfenen
+Zeilen aller Mitglieder — sind **schlechter** als der Klassen-Adapter, gegen alle drei
+Vergleichsmaßstäbe:
+
+| Vergleich | Form | w | d | t |
+|---|---|--:|--:|--:|
+| Gruppe-voll − nachtrainiert | inline | 1,50 | −0,0500 | −2,79 |
+| Gruppe-25 % − nachtrainiert | inline | 1,50 | −0,0595 | −3,16 |
+| Gruppe-voll − geliehen | inline | 1,50 | −0,0869 | −4,65 |
+| Gruppe-25 % − geliehen | inline | 1,50 | −0,0964 | −4,80 |
+
+Über die besten Zellen: Mittel −0,090; besser bei 6 Klassen, schlechter bei 18, gleich bei 4.
+Der alte Detektor stimmt zu (−0,098; 3 / 17 / 8). **Mehr Daten aus verwandten Klassen machen
+den Adapter nicht besser, sondern schlechter.**
+
+**Mehrere Mitglieds-Adapter bei festem Gesamtbudget kombinieren** ist ebenfalls verlässlich
+schlechter als der beste einzelne (Schwesterstudie: negativ in 8 von 8 Feldern, 0 von 120
+Klassen-Siegen); alle Adapter gleichzeitig auf vollem Gewicht reißt in 20 von 26 Zellen das
+WER-Tor bei Trefferquote 0,000.
+
+### 3. Obergrenze: kein Rezept auf dieser Seite nennt w = 2,0
+
+Über dieselben 28 Klassen, inline, reißen bei w = 2,0 **alle vier** Adapter-Arme das WER-Tor:
+nachtrainiert +0,167, geliehen +0,168, Gruppe-voll +0,123, Gruppe-25 % +0,109 — gegen die
+Schranke +0,104. Bis w = 1,5 hält jeder Arm. Wo die beste gemessene Zelle einer Klasse früher
+bei w = 2,0 lag, nennt ihre Seite die beste Zelle **unter** der Grenze und sagt, was das kostet.
+
+### 4. Abdeckung: jede Bezeichnung, die ein Nutzer anfragen kann, hat jetzt eine Seite
+
+Der Raum ist die Vereinigung aus angeforderten Klassen, Etiketten, die der Detektor vergeben
+kann, und Mitgliedern des Gruppen-Schemas: **117 Bezeichnungen**. Vorher gab es 31 Seiten.
+
+| Kategorie | Anzahl | was die Seite sagt |
+|---|--:|---|
+| trägt (≥ 0,15 auf Gruppenebene) | 24 | Rezept, Gewicht, Best-of-N |
+| schwach (0 < Quote < 0,15) | 11 | warum, und ob Modell oder Detektor die Grenze ist |
+| funktioniert nicht (0,000) | 10 | dass nichts geht, und was stattdessen |
+| nicht einzeln gemessen | 72 | das gemessene Geschwister und dessen Ergebnis |
+
+Eine Seite für eine Klasse, die **nicht** funktioniert, ist kein Mangel — sie ist die
+nützlichste Seite im Satz, weil sie jemandem einen verlorenen Tag erspart.
+
+Ohne funktionierendes Rezept, ausdrücklich: `growl`, `gulps`, `hiccup`, `hiccups`, `pain_moan`, `pleasure_moan`, `sniff`, `snort`, `sobs`, `swallows`.
+Die Gruppe `sob` (`quiet_sob`, `convulsive_sob`, `trembling_whimper`, `whimper`, `weep`, `sob`,
+`sobs`) ist der klarste Fall: semantisch stimmig, gemessen bei 0,000 auf jedem Arm und jedem
+Gewicht — **die Gruppierung rettet sie nicht**.
+
+### 5. Wo die Grenze das Messgerät ist, nicht das Modell
+
+Eine gemessene Trefferquote kann den Recall des Detektors nicht wesentlich überschreiten.
+Auf echter Sprache, streng:
+
+| Klasse | Detektor-Boden | heißt |
+|---|--:|---|
+| `relief_sigh` | 0,062 | eine Zahl darüber ist nicht erreichbar |
+| `heavy_breathing` | 0,120 | eine Zahl darüber ist nicht erreichbar |
+| `wistful_sigh` | 0,143 | eine Zahl darüber ist nicht erreichbar |
+| `deep_breath` | 0,186 | eine Zahl darüber ist nicht erreichbar |
+| `exasperated_sigh` | 0,226 | eine Zahl darüber ist nicht erreichbar |
+
+Diese fünf lesen auf **Gruppenebene** deutlich besser; genau das ist das Argument für
+die Gruppen, und es ist ein Argument über das *Messen*, nicht über das Erzeugen.
+
+<!-- /vb_grp:2026-09-05 -->
