@@ -16,6 +16,13 @@ Brackets are what tell the three tag kinds apart, and the rule is unforgiving:
 square bracket = seconds; round bracket *with* a number = a burst; round bracket
 *without* a number = a delivery direction.  A direction that picks up a number
 becomes a burst, so directions here never carry one.
+
+A round bracket without a number is then read one of two ways depending on
+whether it NAMES a burst, and getting that wrong is silent: an unrecognised
+label becomes a direction, the round bracket turns into an instruction about how
+to speak, and no sound is produced.  The vocabulary is therefore taken from the
+same wikiskills directory `skills.py` uses to decide what to offer the director
+— see `burst_vocabulary()` — rather than from a second list that would drift.
 """
 import re
 
@@ -32,7 +39,10 @@ TAIL_PAUSE = 0.30
 # Segments over 12 s were split again in training, so nothing longer is emitted.
 SEG_MAX = 12.0
 
-# labels that actually occur in the training data
+# The core labels, hard-coded: the ones that actually occur in the training data
+# and the fallback vocabulary when the skills directory is not on disk.  This is
+# NOT the whole vocabulary — see `burst_vocabulary()` — but it is the only list
+# the fuzzy fragment rule in `_is_burst_label` is allowed to match against.
 BURST_LABELS = [
     "low mumble", "ahem", "contented sigh", "surprised gasp", "chuckle",
     "breathy giggle", "childlike giggle", "wistful sigh", "exhausted groan",
@@ -48,9 +58,73 @@ _DUR_RE = re.compile(r"\[\s*[0-9]*\.?[0-9]+\s*(?:s|sec|seconds?)?\s*duration\s*\
 _CUE_RE = re.compile(r"\(([^)]*)\)")
 
 
+_VOCAB_CACHE = {}
+
+
+def burst_vocabulary(root=None):
+    """Every label that counts as a vocal burst rather than a delivery direction.
+
+    Resolution order, first source that yields anything wins for the *wiki* half;
+    the hard-coded core is always unioned in on top:
+
+      1. `<SKILLS_DIR>/patterns/vb-<label>.md` — one page per label.  This is the
+         authoritative space: the union of the classes callers ask for, the
+         labels the detector can emit, and the members of the 23-group scheme.
+      2. `<SKILLS_DIR>/VOCAL_BURSTS.md` — the recipe/never/weak tables, via
+         `skills.py`, for the case where the pages are absent but the file is not.
+      3. `BURST_LABELS` alone, when the skills directory is not on disk at all.
+
+    Sourcing it rather than transcribing it is the point: `skills.py` already
+    reads this directory to decide which sounds to OFFER the director, and a
+    second hand-maintained list would drift away from the first.  A label the
+    director is offered and then writes must not be silently re-read as an
+    instruction about how to speak, which is what happens to any label this
+    function does not return (see `parse`).
+
+    Labels are returned in both spellings — `sharp_inhale` and `sharp inhale` —
+    because the wiki keys on underscores and the director writes spaces.
+    """
+    key = root or getattr(config, "SKILLS_DIR", "")
+    if key in _VOCAB_CACHE:
+        return _VOCAB_CACHE[key]
+    labels = set()
+    try:
+        import os
+        pat = os.path.join(key, "patterns")
+        if os.path.isdir(pat):
+            for fn in os.listdir(pat):
+                if fn.startswith("vb-") and fn.endswith(".md"):
+                    labels.add(fn[3:-3].strip().lower())
+        if not labels:
+            import skills as _sk
+            s = _sk.load()
+            if s is not None and s.ok:
+                labels |= set(s.recipes) | set(s.never) | set(s.weak)
+    except Exception as e:                       # never break a turn over this
+        print(f"[timed_script] burst vocabulary fell back to the core list: {e}",
+              flush=True)
+    vocab = set(BURST_LABELS)
+    for lab in labels:
+        vocab.add(lab)
+        vocab.add(lab.replace("_", " "))
+    _VOCAB_CACHE[key] = vocab
+    return vocab
+
+
 def _is_burst_label(txt):
+    """Is this round bracket a vocal burst, or a direction about how to speak?
+
+    Two tests, and only the first one saw the widened vocabulary.  An exact match
+    against `burst_vocabulary()` is a burst.  The older fuzzy rule — a fragment of
+    at most four words containing the last word of a known label, so that "a soft
+    chuckle" lands — still matches against the 22-label core ONLY.  Running it
+    across all 117 wiki labels would start reading ordinary directions as sounds:
+    "(spitting the words out)" contains `spitting`, "(panting after the stairs)"
+    contains `panting`.  Widening the exact half is free; widening the fuzzy half
+    is not.
+    """
     t = txt.strip().lower().rstrip(".")
-    if t in BURST_LABELS:
+    if t in burst_vocabulary():
         return True
     # a short fragment naming a known burst word counts too ("a soft chuckle")
     return len(t.split()) <= 4 and any(b.split()[-1] in t for b in BURST_LABELS)

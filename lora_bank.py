@@ -32,9 +32,11 @@ import config
 # manual-derived doses
 LAM_EMOTION = 0.5
 LAM_EMOTION_UNDER_BURST = 0.5     # capped again against the burst dose at apply time
-# A burst adapter colours a sound the model already produces on its own, so it
-# is dosed lightly: too much and the whole line drifts towards the burst.  A
-# burst standing alone as its own beat gets the higher dose.
+# Fallback burst doses, for a class the wiki has no measured recipe for and for
+# runs with MOSS_SKILLS=0.  A measured class is re-dosed per class in app.py at
+# the weight VOCAL_BURSTS.md records for it (0.25-2.3); see config.BURST_LAM.
+# The "too much drifts the whole line towards the burst" reasoning that used to
+# stand here was the genuineness gate talking, and that gate has been retired.
 LAM_BURST_INLINE = config.BURST_LAM
 LAM_BURST_SOLO = config.BURST_LAM_INTENSE
 LAM_CHARACTER = 0.75
