@@ -136,7 +136,7 @@ environment variable too, so nothing here needs a code edit to change.
 | `CONTINUITY` | `the same speaker continues without interruption: identical voice, identical person, same microphone and same room.` |
 | `DELIVERY_LEVER` | `adapter` |
 | `EIV_DIR` | `/mnt/nvme/empathic-insights-voice-small` |
-| `EMOTION_NAMES` | `{'Relief', 'Pleasure_Ecstasy', 'Fear', 'Anger', 'Distress', 'Teasing', 'Contemplation', 'Hope_Enthusiasm_Optimism', 'Sexual_Lust', 'Awe', 'Intoxication_Altered_States_of_Consciousness', 'Pain', 'Sourn …` |
+| `EMOTION_NAMES` | `{'Interest', 'Sadness', 'Contentment', 'Concentration', 'Astonishment_Surprise', 'Impatience_and_Irritability', 'Pride', 'Sourness', 'Contemplation', 'Pleasure_Ecstasy', 'Fatigue_Exhaustion', 'Affecti …` |
 | `GEN_MODE` | `adapter` |
 | `HISTORY_TURNS_LOCAL` | `8` |
 | `HISTORY_TURNS_LUNA` | `40` |

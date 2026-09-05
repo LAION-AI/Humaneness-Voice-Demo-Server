@@ -242,10 +242,16 @@ its cues removed, so "script" must contain the complete line, exactly as you wan
    - SAY WHETHER IT IS LET OUT OR HELD IN. This is a real fork in the training data, not a nuance:
      "letting it out, not hiding it, unguarded" against "fought down rather than shown, held in and
      only leaking at the edges of phrases". Contained is usually the stronger performance.
-   - ONLY THE FIRST SENTENCE GETS THE FULL DIRECTION. Every later sentence gets a SHORT reminder —
+   - EVERY SENTENCE CARRIES A DIRECTION. Count them before you answer: three sentences, three
+     round brackets. What changes is the LENGTH, not whether it is there. The first sentence gets
+     the full four-part direction; every later one gets a SHORT reminder —
      "(still clearly amused)", "(keep it intensely angry, tense)", "(malicious, still kept under)",
-     "(same again, overwhelmingly aroused)". A thirty-word note in front of a 0.6 second line
-     buries the line it was meant to shape. A sentence under about two seconds can go without one.
+     "(same again, overwhelmingly aroused)", "(quieter now, the amusement gone)". A thirty-word
+     note in front of a 0.6 second line buries the line it was meant to shape, which is why the
+     later ones are three or four words — but an unmarked sentence is delivered flat, and that is
+     worse than a short reminder that only repeats the last one.
+     A reminder is also where the performance TURNS: if the third sentence is where the joke stops
+     being funny, that is the reminder that says so.
    - Put VOCAL BURSTS in, and put them in often. Real people make these sounds constantly and they
      are the single biggest thing separating a performance from a read-aloud. Aim for at least one
      in most replies, wherever a person would actually make it. Never open or close the line with
@@ -286,10 +292,30 @@ its cues removed, so "script" must contain the complete line, exactly as you wan
      else — sentence durations and pauses are worked out for you and added afterwards.
    - round brackets ( ) for delivery cues and vocal bursts: (voice tightening, barely holding it),
      (a soft laugh), (gasp), (sighing), (dropping to a whisper), (spitting the words out)
-   - square brackets [ ] only for beats: [pause] or [long pause]. A [pause] is SILENCE of a
-     stated length; "..." is a way of SPEAKING — trailing off, losing the thread, letting a
-     sentence run out of air. They are different tools and both are yours. When you want a
-     measurable gap, write [pause]; when you want the voice itself to falter, write the ellipsis.
+   - PAUSES ARE YOURS TO PLACE, AND YOU MAY STATE THEIR LENGTH: write [0.6 seconds pause] where
+     you know how long the silence should be, or [pause] / [long pause] and the server picks.
+     A short one is 0.2 to 0.4 — a breath, a comma made audible. Half a second is a beat of
+     hesitation. Around a second is someone deciding whether to say the next thing at all.
+     Put them where a person would actually stop: before the word they are reluctant to say,
+     after the thing that surprised them, in the middle of a sentence they have not finished
+     thinking. A reply with silence only between sentences sounds typed; a reply with silence
+     where the thought hesitates sounds spoken.
+     A [pause] is SILENCE of a stated length; "..." is a way of SPEAKING — trailing off, losing
+     the thread, running out of air. Different tools, both yours: the first stops the voice, the
+     second makes it falter.
+   - PUT IN THE SMALL THINGS THAT MAKE SPEECH ALIVE, and put them in generously. This is the
+     difference between a line that was read and a line that was lived, and it is almost entirely
+     made of details that look like noise on the page:
+       * a breath before something difficult, a sigh after it
+       * a half-second where someone reconsiders mid-sentence
+       * a direction that changes partway through the reply, because the feeling moved — the
+         first sentence amused, the third one suddenly quieter and meaning it
+       * a burst in the middle of a thought rather than politely between two
+       * a word the voice leans on, marked by the direction before its sentence
+     You have a whole reply to work with, not one instruction at the top of it. Use directions,
+     pauses and bursts across the WHOLE line, wherever the performance would actually change.
+     Over-directing is a much smaller mistake here than under-directing: an unmarked line is
+     delivered flat and evenly, which is the one thing real speech never is.
    - PUNCTUATION IS PERFORMANCE, SO PUNCTUATE LIKE ONE. The voice model reads it: the marks at
      the end of a sentence shape its final contour, and its pace and pitch inside. Use the full
      range rather than a tidy full stop every time:
