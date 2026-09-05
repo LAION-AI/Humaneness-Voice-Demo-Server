@@ -85,3 +85,62 @@ Auswahl unter den Treffern nach Klang. Best-of-N bleibt der wirksamere Hebel als
 * **„Streng“ ist streng bis auf 0,37 %:** `reward._same_class` ist ein Teilstring-Test, ein `Coughing` zählt also als Treffer für `cough`. Über 97.349 Ziel-Cues betrifft das 12 von 3.269 gezählten Erkennungen, **0** davon überschreiten eine 23-Gruppen-Grenze.
 
 <!-- /vb_cls2:sec64 -->
+
+<!-- vb_grp:2026-09-05 -->
+
+## Nachtrag 2026-09-05 — Gruppen, geliehene Adapter, WER-Obergrenze
+
+> Studie `vb_grp`. **Das bestehende Rezept oben bleibt gültig**, wenn es besser gemessen hat: die älteren Studien variieren die *Prompt-Form* und werden von einer Adapter-Messung nicht überholt. Neu ist hier, was die Gruppe beiträgt und wo die WER-Obergrenze liegt.
+
+## Rezept
+
+| | |
+|---|---|
+| Adapter | der ausgelieferte Klassen-Adapter |
+| Gewicht | **0,50** |
+| Skriptart | **eingebettet (inline)** |
+| Best-of-N | **—** Kandidaten für 90 % (konservativ, eine Seed-Rausch-Standardabweichung abgezogen: 2302) |
+
+Best-of-N ist hier der größere Hebel als jede Stärkeänderung.
+
+## Was dabei herauskommt
+
+Gemessen mit `laion/vocal-burst-detector-v2` (83 Klassen, das Instrument der Laufzeit), Gruppenebene nach dem 23-Gruppen-Schema.
+
+| Maß | Wert |
+|---|--:|
+| Trefferquote, **streng** (exakt dieselbe Klasse) | **0,000** |
+| Trefferquote, **Gruppe** (irgendein Mitglied) | **0,000** |
+| größengleiche Zufallskontrolle | 0,011 |
+| netto über der Zufallskontrolle | -0,011 |
+| Genuineness (nur berichtet, kein Tor) | 2,65 |
+| WER (Parakeet), absolut | 0,195 |
+| WER gepaart gegen die eigene w = 0-Zelle | 0,037 (Grenze +0,104) |
+
+Dieselbe Klasse, die drei Wege nebeneinander (jeweils die beste Zelle unter w ≤ 1,5):
+
+| Weg | Adapter | Form / w | Gruppe | streng |
+|---|---|---|--:|--:|
+| eigener Adapter | `shipped` | inline / 0,50 | **0,000** | 0,000 |
+| Gruppen-Adapter (gepoolt) | `grpfull` | inline / 0,50 | **0,000** | 0,000 |
+
+## Warum die Zahl so ist
+
+**Hier funktioniert nichts.** Kein Adapter, kein Gewicht und keine Skriptart bringt diese Klasse über 0,000 — und die Gruppierung rettet sie nicht: auch auf Gruppenebene bleibt es bei 0,000. Das ist ein Ergebnis, kein fehlender Messwert.
+
+## Wenn es nicht geht
+
+Nichts an diesem Etikett funktioniert. Die ehrliche Empfehlung ist, den Laut **nicht über das Burst-Etikett** anzufordern, sondern den Charakter über die Emotionsanweisung zu steuern.
+ In derselben Gruppe `moan` sind gemessen: `pleasure_moan` — dort lohnt der Blick.
+
+
+## Woher die Zahlen kommen
+
+* **Messgerät:** `laion/vocal-burst-detector-v2` (83 Klassen, das Instrument der Laufzeit). Die beiden Detektoren sind **nicht** austauschbar; keine Zeile mischt sie.
+* **Gruppen-Schema:** `vm_groups.py` md5 `f83e3850` (23 Gruppen, 117 Mitgliedsnamen).
+* **Trägersatz:** `$SC/out/burst_dose2/prompt_sets.json`, 10 Prompts je (Skriptart, Klasse), Startwert hängt allein vom Prompt-Index ab — alle Arme ziehen dasselbe Rauschen.
+* **Statistik:** die drei Stichproben eines Prompts werden zuerst gemittelt, n ist die Zahl der Prompts.
+* **WER-Obergrenze:** w = 2,0 ist ausgeschlossen. Über die 28 Klassen der zehn zweiquelligen Gruppen reißen dort **alle vier** Adapter-Arme das Tor (nachtrainiert +0,167, geliehen +0,168, Gruppe-voll +0,123, Gruppe-25 % +0,109 gegen die Schranke +0,104). Bis w = 1,5 hält jeder Arm.
+* Studie `vb_grp`, Zustand `~/reports/STATE_burst_group_lora.md`.
+
+<!-- /vb_grp:2026-09-05 -->

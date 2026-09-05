@@ -87,3 +87,63 @@ Auswahl unter den Treffern nach Klang. Best-of-N bleibt der wirksamere Hebel als
 * **„Streng“ ist streng bis auf 0,37 %:** `reward._same_class` ist ein Teilstring-Test, ein `Coughing` zählt also als Treffer für `cough`. Über 97.349 Ziel-Cues betrifft das 12 von 3.269 gezählten Erkennungen, **0** davon überschreiten eine 23-Gruppen-Grenze.
 
 <!-- /vb_cls2:sec64 -->
+
+<!-- vb_grp:2026-09-05 -->
+
+## Nachtrag 2026-09-05 — Gruppen, geliehene Adapter, WER-Obergrenze
+
+> Studie `vb_grp`. **Das bestehende Rezept oben bleibt gültig**, wenn es besser gemessen hat: die älteren Studien variieren die *Prompt-Form* und werden von einer Adapter-Messung nicht überholt. Neu ist hier, was die Gruppe beiträgt und wo die WER-Obergrenze liegt.
+
+## Rezept
+
+| | |
+|---|---|
+| Adapter | der nachtrainierte Klassen-Adapter (`vb_cls2/loras/bulk_mix_full`) (nur der Adapter, ohne Produktions-Stapel) |
+| Gewicht | **1,00** |
+| Skriptart | **allein stehend (solo)** |
+| Best-of-N | **34** Kandidaten für 90 % (konservativ, eine Seed-Rausch-Standardabweichung abgezogen: 2302) |
+
+Best-of-N ist hier der größere Hebel als jede Stärkeänderung.
+
+
+⚠ **Lizenz.** Dieser Adapter ist auf DramaBox-TTS-Audio mittrainiert; die LTX-2 Community Licence ist dafür **nicht geprüft** (§61). Solange das offen ist, bleibt der ausgelieferte Adapter (`shipped`) die freigegebene Rückfallvariante.
+
+## Was dabei herauskommt
+
+Gemessen mit `laion/vocal-burst-detector-v2` (83 Klassen, das Instrument der Laufzeit), Gruppenebene nach dem 23-Gruppen-Schema.
+
+| Maß | Wert |
+|---|--:|
+| Trefferquote, **streng** (exakt dieselbe Klasse) | **0,000** |
+| Trefferquote, **Gruppe** (irgendein Mitglied) | **0,067** |
+| größengleiche Zufallskontrolle | 0,006 |
+| netto über der Zufallskontrolle | 0,061 |
+| Genuineness (nur berichtet, kein Tor) | 2,16 |
+| WER (Parakeet), absolut | 0,413 |
+| WER gepaart gegen die eigene w = 0-Zelle | 0,093 (Grenze +0,104) |
+
+Dieselbe Klasse, die drei Wege nebeneinander (jeweils die beste Zelle unter w ≤ 1,5):
+
+| Weg | Adapter | Form / w | Gruppe | streng |
+|---|---|---|--:|--:|
+| eigener Adapter | `percls_alone` | solo / 1,00 | **0,067** | 0,000 |
+| Gruppen-Adapter (gepoolt) | `grpfull` | inline / 0,50 | **0,000** | 0,000 |
+
+## Warum die Zahl so ist
+
+Die Klasse bleibt unter 0,15. Der Detektor sieht sie (Boden nicht gemessen), das Modell erzeugt sie aber selten. Best-of-N mit 34 Kandidaten ist der einzige wirksame Hebel.
+
+## Wenn es nicht geht
+
+Wenn dieses Etikett nicht trifft: die Gruppe `laugh_loud` enthält `cackle`. Der Adapter des stärksten gemessenen Mitglieds — `vb/cackle` — ist für die ganze Gruppe eine belegte Alternative (dort gemessen: 0,200).
+
+## Woher die Zahlen kommen
+
+* **Messgerät:** `laion/vocal-burst-detector-v2` (83 Klassen, das Instrument der Laufzeit). Die beiden Detektoren sind **nicht** austauschbar; keine Zeile mischt sie.
+* **Gruppen-Schema:** `vm_groups.py` md5 `f83e3850` (23 Gruppen, 117 Mitgliedsnamen).
+* **Trägersatz:** `$SC/out/burst_dose2/prompt_sets.json`, 10 Prompts je (Skriptart, Klasse), Startwert hängt allein vom Prompt-Index ab — alle Arme ziehen dasselbe Rauschen.
+* **Statistik:** die drei Stichproben eines Prompts werden zuerst gemittelt, n ist die Zahl der Prompts.
+* **WER-Obergrenze:** w = 2,0 ist ausgeschlossen. Über die 28 Klassen der zehn zweiquelligen Gruppen reißen dort **alle vier** Adapter-Arme das Tor (nachtrainiert +0,167, geliehen +0,168, Gruppe-voll +0,123, Gruppe-25 % +0,109 gegen die Schranke +0,104). Bis w = 1,5 hält jeder Arm.
+* Studie `vb_grp`, Zustand `~/reports/STATE_burst_group_lora.md`.
+
+<!-- /vb_grp:2026-09-05 -->

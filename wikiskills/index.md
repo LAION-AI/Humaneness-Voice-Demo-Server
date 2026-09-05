@@ -92,6 +92,26 @@ First draft, generated 2026-09-02 from the measured JSON by `code/build_wikiskil
 
 * [interactions.md](interactions.md) — the 2×2×2 factorial: which levers combine and which cancel, per family.
 
+<!-- vb_grp:2026-09-05 -->
+
+## Vocal bursts (117)
+
+Jede Bezeichnung, die ein Nutzer plausibel anfragen kann, hat eine Seite unter
+`patterns/vb-<name>.md` — die Vereinigung aus den angeforderten Klassen, den Etiketten, die der
+Burst-Detektor vergeben kann, und den Mitgliedern des 23-Gruppen-Schemas.
+
+* **Einstieg:** `VOCAL_BURSTS.md` — Rezepte, was nicht funktioniert, und die Obergrenze für den
+  Skalierungsfaktor.
+* **24** Bezeichnungen tragen (Trefferquote ≥ 0,15 auf Gruppenebene), **11** sind schwach,
+  **10** funktionieren nachweislich **nicht**, **72** sind nicht einzeln gemessen und verweisen
+  auf ihr gemessenes Gruppen-Geschwister.
+* Eine Seite für eine Klasse, die nicht funktioniert, ist Absicht: sie sagt, was versucht wurde,
+  was es erreicht hat, ob das Modell oder der Detektor die Grenze ist, und was man stattdessen
+  tun soll.
+* **Kein Rezept nennt w = 2,0** — dort reißen alle Adapter-Arme das WER-Tor.
+
+<!-- /vb_grp:2026-09-05 -->
+
 ## What is not here yet
 
 * **Vocal-burst classes.** ~~No operating point to write down.~~ **Superseded 2026-09-02, extended 2026-09-04:** see [VOCAL_BURSTS.md](VOCAL_BURSTS.md). §51/52 gave 31 classes a measured recipe over the PROMPT FORM. §64 (`vb_cls2`) adds the other two knobs — ADAPTER and SCALING WEIGHT — over 45 classes: 14 of the old recipes stand, 12 are replaced, 19 classes get a first recipe. Family-relaxed hit rate is the primary figure and the strict rate is reported beside it, because the production detector's own per-class recall floors it for the whole sigh/breath family. Genuineness no longer gates a weight; WER still does. Audio for every row: `~/reports/bericht_vokale_bursts.html`.
