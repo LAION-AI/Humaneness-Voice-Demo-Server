@@ -69,6 +69,42 @@ The selector in the page pins one set for a whole turn instead, which is what
 makes an A/B possible; `recipe` is the default and the only setting that follows
 the measurements.
 
+## Why a scream did not happen, and what changed
+
+A real turn wrote `(a raw, tearing scream, completely overwhelmed by sudden
+shock)` and produced no scream and loaded no scream adapter. Traced on that exact
+script, there were three separate causes.
+
+**1. The bracket was a direction, not a burst.** A round bracket without a number
+is an instruction about how to *speak* the next sentence. `scream` is in the
+vocabulary; `a raw, tearing scream, completely overwhelmed by sudden shock` is
+not. So no `(scream, N.N seconds)` tag reached the model, no time was budgeted
+for the sound, and no adapter was pulled. The prompt already told the director to
+write the sound rather than describe it, and it described it anyway.
+
+*Fixed by repairing rather than only instructing.* When a direction contains an
+offerable burst label as a whole phrase, the direction is **kept** and a bare
+burst bracket is inserted after it. The match is narrow on purpose — whole word,
+and only labels with a measured recipe above the bar — which is what stops
+`(spitting the words out)` from becoming a spit: `spitting` never realises, so it
+is not offerable, so it is not repaired.
+
+**2. Only one burst adapter was ever loaded per turn.** `detect_burst` returns a
+single best match over the whole reply, chosen by *longest string*. That line
+tagged both a scream and an exasperated sigh; `exasperated sigh` is the longer
+name, so it won, and the scream lost — not on merit, on spelling. Now the tags
+are read in order and each gets its own adapter, up to `BURST_MAX_ADAPTERS`.
+
+**3. The weight was looked up by adapter name, not by class.** Found while
+verifying the fix: two classes are served by ablation arms filed as
+`ablation_d2_matched__scream`, whose tail is not the class name, so the lookup
+missed and fell back to the flat 0.25 instead of the measured 1.5.
+
+Verified end to end afterwards: the same request now produces
+`(a raw, tearing scream …) (scream)` in the script, and loads
+`ablation_d2_matched__scream @1.5` together with `sharp_inhale @2.3` — two
+adapters, each at its own measured weight.
+
 ## Cue language
 
 Cues are written in **English even when the spoken line is German**. This is the

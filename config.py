@@ -795,3 +795,8 @@ SKILLS_MIN_HIT = float(os.environ.get("MOSS_SKILLS_MIN_HIT", "0.15"))
 BURST_SET = os.environ.get("MOSS_BURST_SET", "recipe")
 BURST_SET_ROOT = {"shipped": "burst", "v2": "burst_v2",
                   "v2_top1": "burst_v2_top1", "group": "burst_grp"}   # "recipe" -> per class
+# How many burst adapters one turn may merge.  The planner used to return a
+# single best match over the whole reply, so a line with two bursts got one
+# adapter and the choice fell to whichever name was the longer string.  Reading
+# the tags instead means a reply can want several; this bounds the merge cost.
+BURST_MAX_ADAPTERS = int(os.environ.get("MOSS_BURST_MAX_ADAPTERS", "3"))

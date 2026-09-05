@@ -919,6 +919,25 @@ async def turn(req: Request):
                 # weights; on sft3 the matching set is the one trained with it
                 specs = [s for s in specs if not s[0].startswith("emotion:")] + emo_spec
 
+        # A burst named inside a delivery direction never becomes a sound: the
+        # bracket is an instruction, no timing is budgeted for it and no adapter
+        # is pulled.  Observed on a real turn whose "(a raw, tearing scream, ...)"
+        # produced no scream at all.  Repaired here, once, so the guard, the
+        # engine and the transcript in the UI all see the same script.
+        if use_skills:
+            try:
+                import skills as _sk0
+                _s0 = _sk0.load()
+                if _s0 is not None and _s0.ok and lb is not None:
+                    _fixed, _added = _s0.repair_script(
+                        out.get("script") or "", lb.names("burst"))
+                    if _added:
+                        out["script"] = _fixed
+                        print(f"[skills] burst named inside a direction, given its "
+                              f"own bracket: {_added}", flush=True)
+            except Exception as e:
+                print(f"[skills] script repair skipped: {e}", flush=True)
+
         # Per-class burst weights.  The flat 0.25 / 0.5 was a conservative guess
         # made when seven adapters existed, and it was capped by a genuineness
         # gate that has since been dropped on purpose; the measured optimum is
@@ -942,8 +961,6 @@ async def turn(req: Request):
                         else:
                             cand = f"{config.BURST_SET_ROOT.get(_sel, 'burst')}:{cls}"
                         return cand if cand in lb.repos else n
-                    specs = [((_reroot(n), l) if n.startswith("burst:") else (n, l))
-                             for n, l in specs]
                     _cap = config.BURST_LAM_MAX
 
                     def _burst_lam(name, flat):
@@ -952,6 +969,29 @@ async def turn(req: Request):
                         # on a measured weight.
                         return min(_s.weight_for(name.split(":", 1)[-1], flat), _cap)
                     _isb = lambda n: n.split(":", 1)[0].startswith("burst")
+                    # One adapter per burst the script actually tags.  The
+                    # planner returns a single best match over the whole reply,
+                    # chosen by longest string — so a line with a scream and an
+                    # exasperated sigh loaded only the sigh, because its name is
+                    # the longer one.  Read the tags instead, in order.
+                    tagged = []
+                    for it in timed_script.parse(out.get("script") or ""):
+                        if it[0] == "burst":
+                            lab = str(it[1]).strip().lower().replace(" ", "_")
+                            if lab and lab not in tagged:
+                                tagged.append(lab)
+                    tagged = tagged[:config.BURST_MAX_ADAPTERS]
+                    specs = [(n, l) for n, l in specs if not n.startswith("burst")]
+                    for lab in tagged:
+                        cand = _reroot(f"burst:{lab}")
+                        if cand in lb.repos:
+                            # weight by the CLASS, not the adapter name: the
+                            # ablation arms are filed as
+                            # `ablation_d2_matched__scream`, whose tail is not
+                            # the class, so weighting by the name silently fell
+                            # back to the flat default.
+                            specs.append(
+                                (cand, _burst_lam(f"burst:{lab}", config.BURST_LAM)))
 
                     specs = [((n, _burst_lam(n, l)) if _isb(n)
                               else (n, l)) for n, l in specs]

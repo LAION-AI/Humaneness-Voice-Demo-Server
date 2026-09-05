@@ -115,6 +115,7 @@ environment variable too, so nothing here needs a code edit to change.
 | `BURST_LAM` | `0.25` |
 | `BURST_LAM_INTENSE` | `0.5` |
 | `BURST_LAM_MAX` | `2.3` |
+| `BURST_MAX_ADAPTERS` | `3` |
 | `BURST_SET` | `recipe` |
 | `BURST_SET_ROOT` | `{'shipped': 'burst', 'v2': 'burst_v2', 'v2_top1': 'burst_v2_top1', 'group': 'burst_grp'}` |
 | `CFG_COST_FACTOR` | `1.93` |
@@ -126,7 +127,7 @@ environment variable too, so nothing here needs a code edit to change.
 | `CONTINUITY` | `the same speaker continues without interruption: identical voice, identical person, same microphone and same room.` |
 | `DELIVERY_LEVER` | `adapter` |
 | `EIV_DIR` | `/mnt/nvme/empathic-insights-voice-small` |
-| `EMOTION_NAMES` | `{'Disgust', 'Malevolence_Malice', 'Longing', 'Embarrassment', 'Disappointment', 'Elation', 'Intoxication_Altered_States_of_Consciousness', 'Distress', 'Pain', 'Triumph', 'Pleasure_Ecstasy', 'Emotional …` |
+| `EMOTION_NAMES` | `{'Teasing', 'Hope_Enthusiasm_Optimism', 'Affection', 'Sourness', 'Pride', 'Impatience_and_Irritability', 'Intoxication_Altered_States_of_Consciousness', 'Embarrassment', 'Doubt', 'Emotional_Numbness', …` |
 | `GEN_MODE` | `adapter` |
 | `HISTORY_TURNS_LOCAL` | `8` |
 | `HISTORY_TURNS_LUNA` | `40` |

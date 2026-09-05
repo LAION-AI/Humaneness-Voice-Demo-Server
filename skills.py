@@ -262,6 +262,56 @@ class Skills:
         return "\n".join(L)
 
 
+    def repair_script(self, script, available):
+        """Give a burst named inside a delivery direction its own bracket.
+
+        The failure this fixes, observed in a real turn: the director wrote
+        `(a raw, tearing scream, completely overwhelmed by sudden shock)` and no
+        scream was produced.  A round bracket without a number is a *direction* —
+        an instruction about how to speak the next sentence — so the label inside
+        it is prose, no `(scream, N.N seconds)` tag reaches the model, no time is
+        budgeted for the sound, and no adapter is pulled.  `scream` had a recipe
+        the whole time.
+
+        Telling the director not to do this is already in the prompt and it did
+        it anyway, so the server repairs it: the direction is KEPT, and a bare
+        burst bracket for the label is inserted after it.  Additive, so a
+        direction that also carries real delivery information does not lose it.
+
+        The match is deliberately narrow — whole word, and only labels that have
+        a measured recipe above the bar.  That is what stops
+        `(spitting the words out)` from becoming a spit: `spitting` never
+        realises, so it is not offerable, so it is not repaired.
+        """
+        import re as _re
+        offer = {c for c, _ in self.offerable(available)}
+        if not offer:
+            return script, []
+        # longest first, so "fearful gasp" wins over "gasp"
+        labels = sorted(offer, key=len, reverse=True)
+        out, added, pos = [], [], 0
+        for m in _re.finditer(r"\(([^)]*)\)", str(script or "")):
+            body = m.group(1)
+            if _re.search(r"[0-9]", body):          # already a burst
+                continue
+            low = body.lower()
+            for lab in labels:
+                spaced = lab.replace("_", " ")
+                if _re.search(rf"\b{_re.escape(spaced)}\b", low) and spaced != low.strip():
+                    out.append((m.end(), spaced))
+                    added.append(spaced)
+                    break
+        if not out:
+            return script, []
+        s2, last = [], 0
+        for at, lab in out:
+            s2.append(script[last:at])
+            s2.append(f" ({lab})")
+            last = at
+        s2.append(script[last:])
+        return "".join(s2), added
+
+
 _CACHE = {}
 
 
