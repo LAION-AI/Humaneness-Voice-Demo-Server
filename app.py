@@ -1176,6 +1176,7 @@ async def turn(req: Request):
         except (TypeError, ValueError):
             bon_n = 1
         bon = None
+        bon_error = None
         if bon_n > 1 and STATE.get("judge") is not None and config.TIMED_SCRIPT:
             try:
                 _tg, _fr, _pl = timed_script.render(out["script"], speed=speed)
@@ -1197,13 +1198,42 @@ async def turn(req: Request):
                 else:
                     gv = 1.0
                 t_bon = time.time()
-                waves = await loop.run_in_executor(
-                    None, lambda: tts.generate_batch(
-                        [dict(item) for _ in range(bon_n)], lora_specs=specs,
-                        seed=int(body.get("seed") or 1234), guidance=gv,
-                        # one seed per candidate, or the batch is N copies of the
-                        # same take: the loop seeds once for the whole batch
-                        seed_per_item=True))
+
+                def _gen(items, g):
+                    return tts.generate_batch(items, lora_specs=specs,
+                                              seed=int(body.get("seed") or 1234),
+                                              guidance=g, seed_per_item=True)
+
+                def _gen_chunked():
+                    """Generate N candidates, in as few passes as fit in memory.
+
+                    Guidance doubles the batch -- two branches per candidate --
+                    so eight candidates are sixteen sequences, and that OOMs on a
+                    24 GB card often enough to matter.  It used to fail the whole
+                    block and fall back to streaming, which produced exactly one
+                    take and no explanation.  Halve and retry instead: a slower
+                    best-of-N is still best-of-N.
+                    """
+                    import torch as _t
+                    size = min(bon_n, config.BON_BATCH_CFG if gv > 1.0001
+                               else config.BON_BATCH)
+                    while size >= 1:
+                        out, ok = [], True
+                        try:
+                            for off in range(0, bon_n, size):
+                                k = min(size, bon_n - off)
+                                out += _gen([dict(item) for _ in range(k)], gv)
+                        except _t.cuda.OutOfMemoryError:
+                            ok = False
+                            _t.cuda.empty_cache()
+                            print(f"[bestofn] out of memory at batch {size}, "
+                                  f"halving", flush=True)
+                            size //= 2
+                        if ok:
+                            return out
+                    raise RuntimeError("not enough memory for a single candidate")
+
+                waves = await loop.run_in_executor(None, _gen_chunked)
                 cands = STATE["judge"].score(waves, tts.sr, _pl,
                                              general=out["general"],
                                              script=out["script"])
@@ -1243,6 +1273,9 @@ async def turn(req: Request):
                       f"{type(e).__name__}: {e}", flush=True)
                 traceback.print_exc()
                 bon = None
+                # Say so.  Falling back silently produces exactly one player and
+                # looks like an ordinary turn, which is how this went unnoticed.
+                bon_error = f"{type(e).__name__}: {str(e)[:160]}"
 
         # A winning candidate is emitted here and the streaming loop skipped:
         # it is already generated, so re-generating it would be a second take and
@@ -1341,6 +1374,9 @@ async def turn(req: Request):
                 payload["type"] = "start"
                 yield _ev(payload)
             elif kind == "end":
+                if bon_error:
+                    payload = dict(payload)
+                    payload["best_of_error"] = bon_error
                 if guard is not None:
                     tail = guard.flush()
                     if tail is not None and tail.size:

@@ -28,7 +28,7 @@ environment variable too, so nothing here needs a code edit to change.
 | `SFT3_DPO_LAM` | `1.0` |
 | `SFT3_VOICE_LAM` | `1.0` |
 | `SFT3_EMOTION_LAM` | `1.0` |
-| `PROFILE_LORA_LAM` | `0.5` |
+| `PROFILE_LORA_LAM` | `1.0` |
 | `PURE_PROFILE_LAM` | `0.5` |
 | `BASE_STYLE_LORAS` | `()` |
 | `AESTH_LORA` | `` |
@@ -112,9 +112,11 @@ environment variable too, so nothing here needs a code edit to change.
 | `APP_PORT` | `8792` |
 | `ASR_DEVICE` | `cuda:1` |
 | `ASSETS` | `/mnt/nvme/moss-15-v2-assets/loras` |
+| `BON_BATCH` | `8` |
+| `BON_BATCH_CFG` | `4` |
 | `BON_CLAP_WEIGHT` | `2.0` |
 | `BON_DEVICE` | `cuda:0` |
-| `BON_GUIDANCE` | `3.0` |
+| `BON_GUIDANCE` | `4.0` |
 | `BON_N` | `8` |
 | `BON_ON` | `False` |
 | `BON_WER_KNEE` | `0.0` |
@@ -134,7 +136,7 @@ environment variable too, so nothing here needs a code edit to change.
 | `CONTINUITY` | `the same speaker continues without interruption: identical voice, identical person, same microphone and same room.` |
 | `DELIVERY_LEVER` | `adapter` |
 | `EIV_DIR` | `/mnt/nvme/empathic-insights-voice-small` |
-| `EMOTION_NAMES` | `{'Thankfulness_Gratitude', 'Infatuation', 'Pleasure_Ecstasy', 'Emotional_Numbness', 'Amusement', 'Contemplation', 'Contentment', 'Jealousy_and_Envy', 'Sexual_Lust', 'Bitterness', 'Affection', 'Hope_En …` |
+| `EMOTION_NAMES` | `{'Hope_Enthusiasm_Optimism', 'Sourness', 'Sexual_Lust', 'Amusement', 'Jealousy_and_Envy', 'Pride', 'Awe', 'Relief', 'Pain', 'Interest', 'Affection', 'Disappointment', 'Shame', 'Disgust', 'Longing', 'A …` |
 | `GEN_MODE` | `adapter` |
 | `HISTORY_TURNS_LOCAL` | `8` |
 | `HISTORY_TURNS_LUNA` | `40` |

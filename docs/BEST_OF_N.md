@@ -94,6 +94,19 @@ nothing about another. Only the raw terms are comparable.
 > all three rows were measuring the unguided path. The endpoint now forwards it,
 > along with the neutralised prompt each item needs.
 
+## Memory
+
+Guidance doubles the batch — two branches per candidate — so eight guided
+candidates are sixteen sequences, and that does not fit beside the model on a
+24 GB card. It used to fail the whole block and fall back to streaming, which
+produced **exactly one take and no explanation**: indistinguishable from an
+ordinary turn unless you read the server log.
+
+Candidates now go through in chunks (`BON_BATCH` 8, `BON_BATCH_CFG` 4), and an
+out-of-memory error halves the chunk and retries rather than giving up — a
+slower best-of-N is still best-of-N. If it does fail, the turn now says so in the
+page instead of quietly looking normal.
+
 ## What this does not do
 
 * **It does not stream.** Nothing plays until every candidate is finished, which

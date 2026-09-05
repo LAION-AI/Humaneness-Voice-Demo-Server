@@ -391,12 +391,20 @@ PROFILE_REFS = os.environ.get("MOSS_PROFILE_REFS",
 DEFAULT_PROFILE = os.environ.get("MOSS_DEFAULT_PROFILE", "emolia_c1699")
 # The profile adapter is the speaker; at 0.25 the identity barely came through.
 # It also replaces the standalone velvet-sage dial rather than stacking with it.
-# The reference recording in the prompt carries most of the identity: speaker
-# similarity with no voice adapter at all is 0.513, and the adapter adds 0.068 of
-# that by 0.25.  0.25 was chosen on those numbers alone -- but identity started
-# breaking audibly once the burst and delivery adapters grew, which similarity
-# against a whole take does not catch.  0.5 is the reported floor for holding it.
-PROFILE_LORA_LAM = float(os.environ.get("MOSS_PROFILE_LORA_LAM", "0.5"))
+# Identity.  Swept with the script held fixed and conditioned on the profile's
+# OWN reference recording, three scripts, two seeds:
+#
+#     w        0.00   0.25   0.50   0.75   1.00   1.25
+#     spk_sim  0.512  0.513  0.464  0.545  0.556  0.549
+#     wer      0.197  0.015  0.027  0.012  0.012  0.062
+#
+# 1.0 is best on both axes at once, and 1.25 gives up intelligibility for
+# nothing.  This dial was 0.25 for a long time on the strength of an earlier
+# sweep that conditioned on the CORPUS anchor -- a different speaker -- so the
+# adapter was measured while fighting the reference clip and looked useless.
+# Against the right anchor it is worth 0.044 of similarity over no adapter, and
+# it costs no word error until 1.25.
+PROFILE_LORA_LAM = float(os.environ.get("MOSS_PROFILE_LORA_LAM", "1.0"))
 
 # Host-RAM cache bound for adapters.  65 GB exist on disk; without a cap a long
 # session loads its way through them until the kernel intervenes.
@@ -861,9 +869,11 @@ BURST_LAM_BUDGET = float(os.environ.get("MOSS_BURST_LAM_BUDGET", "3.0"))
 # forward pass, so the set costs little more than one take.
 BON_ON = os.environ.get("MOSS_BON", "0") not in ("0", "false", "")
 BON_N = int(os.environ.get("MOSS_BON_N", "8"))
-# Guidance for the candidates.  1.0 is off; with guidance on, 3.0 is the family
-# default for emotion and the value the crossfade study separated best at.
-BON_GUIDANCE = float(os.environ.get("MOSS_BON_GUIDANCE", "3.0"))
+# Guidance for the candidates.  1.0 is off.  4.0 is the ceiling the crossfade
+# study measured -- anchor separation rises monotonically to it with no reversal
+# anywhere in the grid -- and it is what a listener reported as the top of the
+# usable range.  Its cost over 3.0 is not separable on the data we have.
+BON_GUIDANCE = float(os.environ.get("MOSS_BON_GUIDANCE", "4.0"))
 # How much the "is this the performance that was asked for" term counts.  Double,
 # because the other two terms measure whether a take is good at all rather than
 # whether it is the right one.
@@ -875,3 +885,9 @@ BON_CLAP_WEIGHT = float(os.environ.get("MOSS_BON_CLAP_W", "2.0"))
 # old behaviour back.
 BON_WER_KNEE = float(os.environ.get("MOSS_BON_WER_KNEE", "0"))
 BON_DEVICE = os.environ.get("MOSS_BON_DEVICE", "cuda:0")
+# How many candidates go through the model at once.  Guidance doubles the batch
+# -- two branches per candidate -- so it gets its own, smaller figure; eight
+# candidates guided is sixteen sequences and that does not fit beside the model
+# on a 24 GB card.  Exceeding it is not fatal: the batch halves and retries.
+BON_BATCH = int(os.environ.get("MOSS_BON_BATCH", "8"))
+BON_BATCH_CFG = int(os.environ.get("MOSS_BON_BATCH_CFG", "4"))
