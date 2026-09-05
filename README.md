@@ -26,6 +26,7 @@ Two pages ship in the server:
 |---|---|
 | use the server without the web page, with or without a language model | [`docs/API.md`](docs/API.md) |
 | know exactly what the director is told, and why | [`docs/PROMPTING.md`](docs/PROMPTING.md) |
+* [`docs/BENCHMARK.md`](docs/BENCHMARK.md) — performing a JSON benchmark item, and the verbatim guarantee
 | reproduce this configuration elsewhere | [`docs/API.md`](docs/API.md) §"Reproducing this server elsewhere", then [`docs/DEFAULTS.md`](docs/DEFAULTS.md) |
 | understand how adapters are loaded and weighted | [`docs/ADAPTERS.md`](docs/ADAPTERS.md) |
 | see what was measured, and what turned out to be wrong | [`docs/EXPERIMENTS.md`](docs/EXPERIMENTS.md), [`docs/LEARNINGS.md`](docs/LEARNINGS.md) |

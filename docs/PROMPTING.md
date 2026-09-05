@@ -83,18 +83,9 @@ Three rules that are easy to get wrong:
 * **Say whether it is let out or held in.** That is a fork in the training data,
   not a shade: *"letting it out, not hiding it, unguarded"* against *"fought down
   rather than shown, only leaking at the edges of phrases"*.
-* **Every sentence carries a direction; what changes is its length.** The first
-  gets the full four-part note, later ones a three-or-four-word reminder —
-  `(still clearly amused)`, `(malicious, still kept under)`. A thirty-word note
-  in front of a 0.6 second line buries it, but an unmarked sentence is delivered
-  flat, which is worse. This was phrased as *"only the first sentence gets the
-  full direction"* and read as *"only the first sentence gets a direction"*: the
-  director gave one bracket to a whole reply. Leading with the requirement
-  instead of the restriction fixed it.
-* **Pauses may carry their own length.** `[0.6 seconds pause]` where the director
-  knows how long the silence should be, `[pause]` where the server should pick.
-  0.2–0.4 is a breath, half a second a beat of hesitation, a second someone
-  deciding whether to say the next thing at all.
+* **Full direction on the first sentence only.** Later sentences get a short
+  reminder — `(still clearly amused)`, `(malicious, still kept under)`. A
+  thirty-word note in front of a 0.6 second line buries the line.
 
 **Cues are written in English even when the line is German.** The corpus is
 written that way: its German rows read
@@ -409,6 +400,19 @@ its cues removed, so "script" must contain the complete line, exactly as you wan
      pauses and bursts across the WHOLE line, wherever the performance would actually change.
      Over-directing is a much smaller mistake here than under-directing: an unmarked line is
      delivered flat and evenly, which is the one thing real speech never is.
+     THIS IS WHAT THE DIFFERENCE LOOKS LIKE. The same reply, written flat and then written
+     as someone would actually say it:
+       flat:  (clearly amused) I promise I will not tell anyone until after lunch. It is the
+              best thing that has happened all week.
+       spoken: (clearly amused, held in and only leaking at the edges) I promise I will not
+              tell anyone [0.4 seconds pause] until after lunch. (chuckle, 0.3 seconds)
+              (still amused, quieter now) It is [0.25 seconds pause] honestly the best thing
+              that has happened all week.
+     Notice where the silences are: NOT between the sentences, but inside them — before the
+     condition the speaker is enjoying withholding, and in front of the word they choose on the
+     way past it. That is the whole difference. Sentences separated by silence sound like a list;
+     silence inside a sentence sounds like a person thinking while they talk.
+     AT LEAST ONE PAUSE IN EVERY REPLY SITS INSIDE A SENTENCE, not between two.
    - PUNCTUATION IS PERFORMANCE, SO PUNCTUATE LIKE ONE. The voice model reads it: the marks at
      the end of a sentence shape its final contour, and its pace and pitch inside. Use the full
      range rather than a tidy full stop every time:

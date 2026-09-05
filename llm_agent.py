@@ -316,6 +316,19 @@ its cues removed, so "script" must contain the complete line, exactly as you wan
      pauses and bursts across the WHOLE line, wherever the performance would actually change.
      Over-directing is a much smaller mistake here than under-directing: an unmarked line is
      delivered flat and evenly, which is the one thing real speech never is.
+     THIS IS WHAT THE DIFFERENCE LOOKS LIKE. The same reply, written flat and then written
+     as someone would actually say it:
+       flat:  (clearly amused) I promise I will not tell anyone until after lunch. It is the
+              best thing that has happened all week.
+       spoken: (clearly amused, held in and only leaking at the edges) I promise I will not
+              tell anyone [0.4 seconds pause] until after lunch. (chuckle, 0.3 seconds)
+              (still amused, quieter now) It is [0.25 seconds pause] honestly the best thing
+              that has happened all week.
+     Notice where the silences are: NOT between the sentences, but inside them — before the
+     condition the speaker is enjoying withholding, and in front of the word they choose on the
+     way past it. That is the whole difference. Sentences separated by silence sound like a list;
+     silence inside a sentence sounds like a person thinking while they talk.
+     AT LEAST ONE PAUSE IN EVERY REPLY SITS INSIDE A SENTENCE, not between two.
    - PUNCTUATION IS PERFORMANCE, SO PUNCTUATE LIKE ONE. The voice model reads it: the marks at
      the end of a sentence shape its final contour, and its pace and pitch inside. Use the full
      range rather than a tidy full stop every time:
@@ -738,6 +751,28 @@ class LLMAgent:
             # unchanged, so a persona changes who speaks, not what it can do
             system = ("CHARACTER — this is who you are for this whole "
                       "conversation:\n" + persona.strip() + "\n\n" + system)
+        # A benchmark item arrives as raw JSON.  Handed that, the local 12B has
+        # to parse it, find the line among nine fields and follow the format
+        # rules at once, and it answers *about* the situation instead of
+        # performing the sentence.  Rewrite it into a plain task first; the JSON
+        # never reaches the model.
+        item = None
+        try:
+            import benchmark
+            item = benchmark.detect(message)
+        except Exception as e:
+            print(f"[benchmark] detect failed: {e}", flush=True)
+        if item is not None:
+            message = benchmark.brief(item)
+            system = system + (
+                "\n\nTHIS TURN: you have been handed a script to perform. The words "
+                "are fixed and are not yours to change — your work is the "
+                "directions, the pauses and the bursts you place among them. "
+                "Put the given words, annotated, in `script`, and the same words "
+                "without annotation in `reply`.")
+            print(f"[benchmark] item {item.get('id') or '?'} -> acting brief",
+                  flush=True)
+
         msgs = [{"role": "system", "content": system}]
         # Luna is a reasoning model with a very large context: give it enough of
         # the conversation to actually reason about where the scene has got to.
@@ -808,7 +843,48 @@ class LLMAgent:
                    "voice": {"mode": "none"}}
         if self.style == "codes" and self.codebook is not None:
             out = self._from_codes(out)
-        return self._clean(out, identity=identity), ms, raw
+        out = self._clean(out, identity=identity)
+        if item is not None:
+            out = self._hold_to_script(out, item)
+        out = self._breathe(out)
+        return out, ms, raw
+
+    @staticmethod
+    def _hold_to_script(out, item):
+        """A benchmark item is only answered if the words came back unchanged."""
+        import benchmark
+        sc = out.get("script") or ""
+        if benchmark.verbatim_ok(sc, item):
+            return out
+        print("[benchmark] model drifted off the given script; "
+              "using the plain rendering", flush=True)
+        out["script"] = benchmark.annotate(item)
+        out["reply"] = benchmark.script_text(item)
+        return out
+
+    @staticmethod
+    def _breathe(out):
+        """Give the line its breath back if it came back without any.
+
+        The rules ask for silence inside a sentence and the model still writes
+        replies that only stop at full stops, which reads as typed rather than
+        spoken.  This never overrides a pause the model chose: it fires only
+        when there is none, and only at commas, dashes and the conjunctions
+        that begin a new thought.
+        """
+        if not config.BREATHE_ON:
+            return out
+        try:
+            import benchmark
+            sc, n = benchmark.breathe(out.get("script") or "",
+                                      limit=config.BREATHE_MAX)
+            if n:
+                out["script"] = sc
+                print(f"[breathe] added {n} pause(s) the model left out",
+                      flush=True)
+        except Exception as e:
+            print(f"[breathe] skipped: {e}", flush=True)
+        return out
 
     def _from_codes(self, o):
         """Expand the compact code answer into the full prose shape."""

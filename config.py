@@ -891,3 +891,12 @@ BON_DEVICE = os.environ.get("MOSS_BON_DEVICE", "cuda:0")
 # on a 24 GB card.  Exceeding it is not fatal: the batch halves and retries.
 BON_BATCH = int(os.environ.get("MOSS_BON_BATCH", "8"))
 BON_BATCH_CFG = int(os.environ.get("MOSS_BON_BATCH_CFG", "4"))
+
+# ---------------------------------------------------------------- breath ----
+# The prompt asks for silence *inside* a sentence and the model still returns
+# replies that only stop at full stops.  When a reply comes back with no pause
+# inside any sentence, put one at up to BREATHE_MAX natural breathing points —
+# a comma, a dash, the conjunction that starts a new thought.  A pause the model
+# chose itself is never touched.
+BREATHE_ON = os.environ.get("MOSS_BREATHE", "1") not in ("0", "false", "no")
+BREATHE_MAX = int(os.environ.get("MOSS_BREATHE_MAX", "2"))
