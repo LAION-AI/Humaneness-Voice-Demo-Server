@@ -53,7 +53,18 @@ A burst named inside a direction produces no sound at all: the whole bracket is
 read as an instruction. The director is told this, and the server repairs it when
 it happens anyway.
 
-**The director never writes a number inside a bracket.** It writes
+**The director writes the burst's length itself** — `(contented sigh, 0.2 seconds)`,
+`(scream, 0.6 seconds)` — because that is the form the voice model was trained on
+and the number is what marks a bracket as a sound rather than an instruction. It
+knows the moment; the server does not. Left off, the server supplies the corpus
+median of 0.28 s, and anything past 1.2 s is clamped as outside what the model
+has heard.
+
+**A delivery direction must never carry a number.** That is the one bracket rule
+that cannot bend: `(quietly, 2 seconds)` is performed as a sound named "quietly".
+Sentence durations and pauses stay with the server.
+
+Historically the director was forbidden any number at all It writes
 `(chuckle)`, optionally `(short chuckle)` or `(long chuckle)`, and the server
 supplies 4 frames per word for speech and
 0.28s / 0.14s / 0.48s
@@ -337,9 +348,14 @@ its cues removed, so "script" must contain the complete line, exactly as you wan
      A BURST IS ITS OWN BRACKET AND ITS OWN MOMENT, standing between sentences: "(chuckle)" on its
      own, never "(clearly amused, with a chuckle)" — named inside a direction it produces no sound
      at all, because the whole bracket is then read as an instruction about how to speak.
-     The server gives every burst its length before sending it. You may write "short" or "long" in
-     front of the label — "(long exhausted groan)", "(short chuckle)" — and nothing else: real
-     bursts in the training data run 0.14 to 0.48 seconds, so "long" is half a second, not two.
+     WRITE THE LENGTH INSIDE THE BRACKET, after the label and a comma:
+         (contented sigh, 0.2 seconds)   (scream, 0.6 seconds)   (sharp inhale, 0.15 seconds)
+     That is the form the voice model was trained on, and the number is what tells it a burst is a
+     sound rather than an instruction. Choose the length for the moment: real bursts in the
+     training data run 0.14 to 0.48 seconds, median 0.28, and the longest ever recorded is 2.46.
+     A quick catch of breath is 0.15, an ordinary chuckle 0.3, a sigh you want heard 0.5, a full
+     scream 0.6 to 1.0. Anything past 1.2 is outside what the model has heard and will be trimmed.
+     If you leave the number off the server supplies 0.28, but you know the moment and it does not.
    - EVERY delivery cue names its strength with one of these adverbs, chosen for how hard the
      feeling is actually running. This is the same scale the model was trained against, so the
      word does real work:
@@ -358,13 +374,30 @@ its cues removed, so "script" must contain the complete line, exactly as you wan
      how the training corpus is written — its German lines read "Das zerreisst einen einfach,
      weisst du? (relief sigh)" — and a German cue is outside the distribution the voice model
      learned, where it behaves unpredictably.
-   - NEVER write a number inside a bracket. The timing is worked out for you and added afterwards,
-     and in this format a round bracket that contains a number stops being a direction and becomes
-     a vocal burst. "(quietly, 2 seconds)" would be performed as a sound, not as an instruction.
+   - NEVER put a number in a DELIVERY DIRECTION. This is the one bracket rule that cannot bend: a
+     round bracket WITH a number is a vocal burst and one WITHOUT is an instruction, and that is
+     the only thing separating them. "(quietly, 2 seconds)" is performed as a sound named
+     "quietly", not as an instruction to be quiet. Numbers belong in burst brackets and nowhere
+     else — sentence durations and pauses are worked out for you and added afterwards.
    - round brackets ( ) for delivery cues and vocal bursts: (voice tightening, barely holding it),
      (a soft laugh), (gasp), (sighing), (dropping to a whisper), (spitting the words out)
-   - square brackets [ ] only for beats: [pause] or [long pause]. Prefer [pause] over "..." —
-     pause tags keep the words intelligible, ellipses smear them.
+   - square brackets [ ] only for beats: [pause] or [long pause]. A [pause] is SILENCE of a
+     stated length; "..." is a way of SPEAKING — trailing off, losing the thread, letting a
+     sentence run out of air. They are different tools and both are yours. When you want a
+     measurable gap, write [pause]; when you want the voice itself to falter, write the ellipsis.
+   - PUNCTUATION IS PERFORMANCE, SO PUNCTUATE LIKE ONE. The voice model reads it: the marks at
+     the end of a sentence shape its final contour, and its pace and pitch inside. Use the full
+     range rather than a tidy full stop every time:
+         .     settled, finished, the thought lands
+         ...   trailing off, hesitating, thinking aloud, running out of breath
+         !     energy, insistence, delight, a raised voice
+         ?     a genuine question, the pitch lifting at the end
+         ?!    startled disbelief — a question and an exclamation at once
+         !?    the same, the outrage arriving before the question
+         ???   bewilderment, the question asked again because the first answer made no sense
+         !?!   the loudest of these; keep it rare or it stops meaning anything
+     Mid-sentence commas and dashes matter too — a comma is a small breath, a dash is a break in
+     thought. Write the rhythm you want heard, not the rhythm a copy editor would want.
    - NEVER write a word in capitals, anywhere, in a cue or in the spoken line. This model spells
      capitalised words out letter by letter: "AAAGH!" comes out as "ay-ay-ay-gee-aitch". Write a
      scream as a cue — (a raw, tearing scream) — and let the words stay ordinary lower case.
