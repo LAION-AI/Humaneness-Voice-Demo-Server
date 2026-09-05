@@ -30,6 +30,7 @@ Two pages ship in the server:
 * [`docs/CONTEXT.md`](docs/CONTEXT.md) — the context window, the 400 it caused, and the guard
 * [`docs/ARENA.md`](docs/ARENA.md) — an evolutionary search for a better director prompt, and why it came back null
 * [`docs/ARENA_PROMPTS.md`](docs/ARENA_PROMPTS.md) — every prompt used in that search, verbatim
+* [`docs/SIDON.md`](docs/SIDON.md) — speech restoration: what it improves, and what it leaves exactly as it was
 | reproduce this configuration elsewhere | [`docs/API.md`](docs/API.md) §"Reproducing this server elsewhere", then [`docs/DEFAULTS.md`](docs/DEFAULTS.md) |
 | understand how adapters are loaded and weighted | [`docs/ADAPTERS.md`](docs/ADAPTERS.md) |
 | see what was measured, and what turned out to be wrong | [`docs/EXPERIMENTS.md`](docs/EXPERIMENTS.md), [`docs/LEARNINGS.md`](docs/LEARNINGS.md) |
