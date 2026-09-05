@@ -571,6 +571,14 @@ hand-written placement advice — which told the director to do the one thing
 measured to hurt. Checkbox in the page, on by default. See
 [`docs/SKILLS.md`](docs/SKILLS.md).
 
+## Best-of-N
+
+Generate the turn N times in one batched pass, score every candidate and keep
+one: normalised genuineness plus burst blend plus twice the agreement between
+the take and the direction that was asked for, gated on intelligibility. Eight
+candidates cost 14.9 s, or 29.2 s with guidance. Off by default; see
+[`docs/BEST_OF_N.md`](docs/BEST_OF_N.md).
+
 ## End-trimming
 
 Takes sometimes said the line and then kept going. The audio always matched the

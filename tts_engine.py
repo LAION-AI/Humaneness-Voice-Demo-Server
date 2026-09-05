@@ -283,7 +283,14 @@ class TTSEngine:
                     mdl, st[0]["loc"], p, stop_bias=p.get("stop_bias"))
                 cont = nt.eq(int(cfg.audio_assistant_slot_token_id)) & ~finished
                 finished = finished | nt.eq(int(cfg.audio_end_token_id))
-                if min_frames and len(frames) < min_frames:
+                if min_frames is not None and not isinstance(min_frames, int):
+                    # one floor per row, as in the single-branch loop: a batch
+                    # holds lines of different lengths, and best-of-N sends a
+                    # whole batch through here
+                    below = min_frames > len(frames)
+                    cont = cont | below
+                    finished = finished & ~below
+                elif min_frames and len(frames) < min_frames:
                     cont = torch.ones_like(cont)
                     finished = torch.zeros_like(finished)
                 if not bool(cont.any().item()):
@@ -690,11 +697,23 @@ class TTSEngine:
         generation loop was already written with a batch dimension, so this only
         has to build a padded batch and cut the results apart again.
 
-        `items`: dicts with text, instruction, language, tokens, ref_codes.
+        `items`: dicts with text, instruction, language, tokens, ref_codes, and
+        optionally instruction_unc / text_unc.  When `guidance` > 1 and every item
+        carries a neutralised prompt, the batch runs the two-branch guided loop —
+        both branches padded to the same width, which is why the neutralised half
+        is built as its own batch rather than per item.
+
         Returns a list of float32 arrays at self.sr.
         """
         p = dict(config.DEFAULTS)
         p.update({k: v for k, v in over.items() if v is not None})
+        # Best-of-N passes the same item N times.  Sampling is seeded once for
+        # the whole batch, so without a per-row offset every candidate would be
+        # the same take and the ranking would be choosing between copies.  The
+        # loop draws one multinomial per row from a single generator state, so
+        # the rows differ as long as the batch is sampled at all -- but the seed
+        # is what makes a *rerun* differ, and identical items make that visible.
+        p["seed_per_item"] = bool(over.get("seed_per_item"))
         with self.lock:
             applied = []
             if self.lora is not None:
@@ -710,22 +729,50 @@ class TTSEngine:
                               language=it.get("language", "English"),
                               tokens=int(it["tokens"]))
                     refs = it.get("ref_codes")
-                    if refs:
+                    if refs is not None and not isinstance(refs, (list, tuple)):
+                        refs = [refs]
+                    if refs is not None and len(refs):
                         kw["reference"] = [r.to(torch.long) for r in refs if r is not None]
                     msgs.append([self.proc.build_user_message(**kw)])
                 torch.manual_seed(int(p["seed"] or 0))
                 batch = self.proc(msgs, mode="generation")   # left-padded
                 iid = batch["input_ids"].to(self.device)
                 am = batch["attention_mask"].to(self.device)
+                g = float(over.get("guidance") or 1.0)
+                branch1 = None
+                if g > 1.0001 and all(it.get("instruction_unc") for it in items):
+                    umsgs = []
+                    for it in items:
+                        kw = dict(text=it.get("text_unc") or it["text"],
+                                  instruction=it["instruction_unc"],
+                                  language=it.get("language", "English"),
+                                  tokens=int(it["tokens"]))
+                        refs = it.get("ref_codes")
+                        if refs is not None and not isinstance(refs, (list, tuple)):
+                            refs = [refs]
+                        if refs is not None and len(refs):
+                            kw["reference"] = [r.to(torch.long) for r in refs
+                                               if r is not None]
+                        umsgs.append([self.proc.build_user_message(**kw)])
+                    torch.manual_seed(int(p["seed"] or 0))
+                    ub = self.proc(umsgs, mode="generation")
+                    branch1 = (ub["input_ids"].to(self.device),
+                               ub["attention_mask"].to(self.device))
                 toks = [int(it["tokens"]) for it in items]
                 p["max_new_tokens"] = int(max(toks) * config.TOKEN_HEADROOM) + 64
                 minf = torch.tensor(
                     [int(t * config.MIN_FRAME_FRACTION) for t in toks],
                     device=self.device)
                 frames = None
-                for fr in self._stream_frames(iid, am, p, chunk_frames=10 ** 9,
-                                              min_frames=minf):
-                    frames = fr
+                if branch1 is not None:
+                    for fr in self._stream_frames_cfg(
+                            [(iid, am), branch1], p, chunk_frames=10 ** 9,
+                            min_frames=minf, guidance=g):
+                        frames = fr
+                else:
+                    for fr in self._stream_frames(iid, am, p, chunk_frames=10 ** 9,
+                                                  min_frames=minf):
+                        frames = fr
                 if not frames:
                     return [np.zeros(0, np.float32) for _ in items]
                 allf = torch.stack(frames, dim=1)      # (B, T, n_vq)

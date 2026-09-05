@@ -214,8 +214,8 @@
       <select id="profile"></select></label>
     <label title="Wie stark der Sprecher-Adapter des Profils eingemischt wird">
       identity
-      <input id="plam" type="range" min="0" max="1.5" step="0.05" value="0.25">
-      <b id="plamv">0.25</b></label>
+      <input id="plam" type="range" min="0" max="1.5" step="0.05" value="0.5">
+      <b id="plamv">0.50</b></label>
     <label>brain
       <select id="brain">
         <option value="luna">gpt-5.6-luna (hosted)</option>
@@ -242,6 +242,14 @@
       <input type="checkbox" id="pure"> Pure <i>(Basis + Referenz)</i></label>
     <label title="Die Regieanweisungen waehlen per Retrieval einen Emotions-Adapter, gemergt mit dem publizierten Wert 1.5. Aus: nur SFT3-Basis + abgerufener Referenzclip.">
       <input type="checkbox" id="emonuance" checked> Emotions-Nuancen <i>(Adapter @1.5)</i></label>
+    <label title="Die Zeile N-mal in EINEM Batch erzeugen und die beste behalten. Bewertet nach normalisierter Genuineness + Burst-Blend + 2x der Uebereinstimmung mit der Regieanweisung (VoiceCLAP), multipliziert mit der inversen Wortfehlerrate; ueber 0.85 gilt die als 1.0. Streamt nicht: erst wenn alle fertig sind, laeuft die Beste.">
+      <input type="checkbox" id="bon"> Best-of-N
+      <input id="bonn" type="range" min="2" max="12" step="1" value="8"
+             style="width:70px"><b id="bonnv">8</b></label>
+    <label title="Guidance fuer die Kandidaten. 1.0 = aus. 3.0 ist der Familien-Default fuer Emotion.">
+      Best-of Guidance
+      <input id="bong" type="range" min="1" max="4" step="0.25" value="3.0">
+      <b id="bongv">3.00</b></label>
     <label title="Obergrenze fuer das Merge-Gewicht eines Burst-Adapters. Die Rezepte nennen bis 2.3, gemessen mit EINEM Adapter ohne Produktionsstapel; in diesem Stapel ist es eine Klippe: bis 1.5 kostenlos (WER 0.34), bei 2.0 bricht es ein (0.86) und bei 2.3 zerfaellt die Zeile (1.34).">
       Burst-Gewicht max
       <input id="blmax" type="range" min="0.25" max="2.3" step="0.05" value="1.5">
@@ -551,6 +559,8 @@ async function send(){
                             skills: $('skills').checked,
                             burst_set: $('burstset').value,
                             burst_lam_max: parseFloat($('blmax').value),
+                            best_of: $('bon').checked ? parseInt($('bonn').value) : 1,
+                            best_of_guidance: parseFloat($('bong').value),
                             qdpo_lams: {
                               'sft3_qdpo:quality_dpo':
                                   $('qdpo').checked ? parseFloat($('qdpos').value) : 0,
@@ -617,6 +627,18 @@ async function send(){
             $('lstate').textContent='generating';
             history.push({role:'user',content:text});
             history.push({role:'assistant',content:ev.reply});
+          } else if(ev.type === 'best_of'){
+            const cs = (ev.candidates||[]).slice().sort((a,b)=>a.rank-b.rank);
+            const d = document.createElement('details'); d.className='cues';
+            d.innerHTML = '<summary>Best-of-' + ev.n + ' · g=' + ev.guidance +
+              ' · ' + (ev.ms/1000).toFixed(1) + ' s</summary><pre>' +
+              'rang  reward  gate    wer   genuine  blend   clap\n' +
+              cs.map(c => String(c.rank).padEnd(4) + '  ' +
+                c.reward.toFixed(3).padStart(6) + '  ' + c.gate.toFixed(2) + '  ' +
+                c.wer.toFixed(3).padStart(5) + '  ' + c.genuineness.toFixed(2).padStart(6) +
+                '  ' + c.blend.toFixed(2).padStart(5) + '  ' + c.clap.toFixed(3).padStart(6)
+              ).join('\n') + '</pre>';
+            if(node) node.appendChild(d);
           } else if(ev.type === 'start'){
             startEv = ev; sr = ev.sr || 48000;
             if(ev.prompt && window._lastDet){
@@ -672,7 +694,8 @@ $('send').onclick = send;
 $('vol').addEventListener('input', e=>{ if(gain) gain.gain.value = parseFloat(e.target.value); });
 const dial = (id,out)=>{ const f=()=> $(out).textContent = parseFloat($(id).value).toFixed(2);
                          $(id).addEventListener('input', f); f(); };
-dial('spk','spkv'); dial('aes','aesv'); dial('stopb','stopbv'); dial('plam','plamv'); dial('cfgs','cfgsv'); dial('qdpos','qdposv'); dial('bsdpos','bsdposv'); dial('blmax','blmaxv');
+dial('spk','spkv'); dial('aes','aesv'); dial('stopb','stopbv'); dial('plam','plamv'); dial('cfgs','cfgsv'); dial('qdpos','qdposv'); dial('bsdpos','bsdposv'); dial('blmax','blmaxv'); dial('bong','bongv');
+$('bonn').oninput = ()=> $('bonnv').textContent = $('bonn').value;
 $('sweepbtn').onclick = runSweep;
 // the ten speaker profiles, each with its own anchor recording and adapter
 fetch('/api/state').then(r=>r.json()).then(s=>{

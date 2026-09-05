@@ -391,11 +391,12 @@ PROFILE_REFS = os.environ.get("MOSS_PROFILE_REFS",
 DEFAULT_PROFILE = os.environ.get("MOSS_DEFAULT_PROFILE", "emolia_c1699")
 # The profile adapter is the speaker; at 0.25 the identity barely came through.
 # It also replaces the standalone velvet-sage dial rather than stacking with it.
-# The reference recording in the prompt already carries the identity: speaker
-# similarity without any voice adapter is 0.513.  The adapter adds 0.068 at 0.25
-# and only 0.019 more by 1.0, while word error goes the wrong way.  Most of the
-# identity, none of the cost.
-PROFILE_LORA_LAM = float(os.environ.get("MOSS_PROFILE_LORA_LAM", "0.25"))
+# The reference recording in the prompt carries most of the identity: speaker
+# similarity with no voice adapter at all is 0.513, and the adapter adds 0.068 of
+# that by 0.25.  0.25 was chosen on those numbers alone -- but identity started
+# breaking audibly once the burst and delivery adapters grew, which similarity
+# against a whole take does not catch.  0.5 is the reported floor for holding it.
+PROFILE_LORA_LAM = float(os.environ.get("MOSS_PROFILE_LORA_LAM", "0.5"))
 
 # Host-RAM cache bound for adapters.  65 GB exist on disk; without a cap a long
 # session loads its way through them until the kernel intervenes.
@@ -834,3 +835,23 @@ BURST_MAX_ADAPTERS = int(os.environ.get("MOSS_BURST_MAX_ADAPTERS", "3"))
 # An earlier budget of 1.0 here was set from turn-to-turn comparisons that were
 # dominated by the director writing different scripts, and was wrong.
 BURST_LAM_BUDGET = float(os.environ.get("MOSS_BURST_LAM_BUDGET", "3.0"))
+
+# ---------------------------------------------------------------- best-of-N
+# Generate the turn several times and keep the best.  The burst recipes quote an
+# N per class -- "at a hit rate of 0.27, 8 candidates for 90 % confidence" -- and
+# without this that column is advice nobody can act on.  All N are one batched
+# forward pass, so the set costs little more than one take.
+BON_ON = os.environ.get("MOSS_BON", "0") not in ("0", "false", "")
+BON_N = int(os.environ.get("MOSS_BON_N", "8"))
+# Guidance for the candidates.  1.0 is off; with guidance on, 3.0 is the family
+# default for emotion and the value the crossfade study separated best at.
+BON_GUIDANCE = float(os.environ.get("MOSS_BON_GUIDANCE", "3.0"))
+# How much the "is this the performance that was asked for" term counts.  Double,
+# because the other two terms measure whether a take is good at all rather than
+# whether it is the right one.
+BON_CLAP_WEIGHT = float(os.environ.get("MOSS_BON_CLAP_W", "2.0"))
+# Above this inverse word error rate the gate is 1.0: intelligibility is a
+# threshold, not a preference.  Below it, a garbled take loses however good it
+# sounds.
+BON_WER_KNEE = float(os.environ.get("MOSS_BON_WER_KNEE", "0.85"))
+BON_DEVICE = os.environ.get("MOSS_BON_DEVICE", "cuda:0")

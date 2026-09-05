@@ -20,6 +20,7 @@ import config
 import levers
 import lora_bank
 import align_engine
+import bestofn
 import steer_engine
 import timed_script
 from llm_agent import VOICE_TOOL, LLMAgent
@@ -142,7 +143,16 @@ def _boot():
         except Exception as e:
             print(f"[align] unavailable: {e}", flush=True)
         try:
+            # scored candidates for best-of-N.  Shares the CLAP tower with the
+            # retriever rather than holding a second copy of the same weights.
+            _j = bestofn.Judge(asr=STATE.get("asr"))
+            STATE["judge"] = _j if _j.ok else None
+        except Exception as e:
+            print(f"[align] unavailable: {e}", flush=True)
+        try:
             STATE["retriever"] = retrieval.Retriever(device=str(tts.device))
+            if STATE.get("judge") is not None:
+                STATE["judge"].attach_clap(STATE["retriever"])
         except Exception as e:
             print(f"[retrieval] unavailable: {e}", flush=True)
         if config.USE_LORA:
@@ -168,6 +178,8 @@ def _boot():
             try:
                 from asr_engine import ParakeetASR
                 STATE["asr"] = ParakeetASR()
+                if STATE.get("judge") is not None:
+                    STATE["judge"].asr = STATE["asr"]
             except Exception as e:
                 print(f"[asr] unavailable: {e}", flush=True)
             try:
@@ -1146,6 +1158,106 @@ async def turn(req: Request):
                         expect_s=_fr / config.FRAME_RATE)
             except Exception as e:
                 print(f"[align] guard not built: {e}", flush=True)
+
+        # ---- best-of-N -----------------------------------------------------
+        # Generate the whole turn N times in one batched pass, score every
+        # candidate and stream only the winner.  Nothing is streamed while this
+        # runs -- the point is to choose, and choosing needs all of them.
+        bon_n = body.get("best_of")
+        try:
+            bon_n = int(bon_n) if bon_n is not None else (
+                config.BON_N if config.BON_ON else 1)
+        except (TypeError, ValueError):
+            bon_n = 1
+        bon = None
+        if bon_n > 1 and STATE.get("judge") is not None and config.TIMED_SCRIPT:
+            try:
+                _tg, _fr, _pl = timed_script.render(out["script"], speed=speed)
+                lc = "DE" if str(spoken).lower().startswith(("ger", "de")) else "EN"
+                _gl = timed_script.general_line(
+                    out["general"], _fr / config.FRAME_RATE, lc,
+                    (retr or {}).get("emotion"))
+                item = {"text": _tg, "tokens": _fr, "language": spoken,
+                        "instruction": f"GENERAL: {_gl}\nSCRIPT:\n{_tg}",
+                        "ref_codes": ref_codes}
+                gv = body.get("best_of_guidance")
+                gv = (config.BON_GUIDANCE if gv is None else float(gv))
+                if gv > 1.0001 and out.get("general_unc"):
+                    _gu = timed_script.general_line(
+                        out["general_unc"], _fr / config.FRAME_RATE, lc, None)
+                    _tu = timed_script.neutralise(_tg)
+                    item["instruction_unc"] = f"GENERAL: {_gu}\nSCRIPT:\n{_tu}"
+                    item["text_unc"] = _tu
+                else:
+                    gv = 1.0
+                t_bon = time.time()
+                waves = await loop.run_in_executor(
+                    None, lambda: tts.generate_batch(
+                        [dict(item) for _ in range(bon_n)], lora_specs=specs,
+                        seed=int(body.get("seed") or 1234), guidance=gv,
+                        # one seed per candidate, or the batch is N copies of the
+                        # same take: the loop seeds once for the whole batch
+                        seed_per_item=True))
+                cands = STATE["judge"].score(waves, tts.sr, _pl,
+                                             general=out["general"],
+                                             script=out["script"])
+                bestofn.rank(cands)
+                best = min(range(len(cands)), key=lambda i: cands[i]["rank"])
+                bon = {"n": len(cands), "guidance": gv,
+                       "ms": round((time.time() - t_bon) * 1000, 1),
+                       "chosen": best,
+                       "candidates": [{k: c[k] for k in
+                                       ("reward", "rank", "gate", "wer", "extra_w",
+                                        "genuineness", "blend", "clap", "sec")}
+                                      for c in cands]}
+                print(f"[bestofn] {len(cands)} candidates, g={gv:g}, "
+                      f"{bon['ms']:.0f} ms, best reward "
+                      f"{cands[best]['reward']:.3f} (wer {cands[best]['wer']:.3f})",
+                      flush=True)
+                bon["wave"] = waves[best]
+            except Exception as e:
+                import traceback
+                print(f"[bestofn] failed, falling back to streaming: "
+                      f"{type(e).__name__}: {e}", flush=True)
+                traceback.print_exc()
+                bon = None
+
+        # A winning candidate is emitted here and the streaming loop skipped:
+        # it is already generated, so re-generating it would be a second take and
+        # a different one.  The chunking mirrors the streaming protocol so the
+        # client cannot tell the difference apart from when the audio starts.
+        if bon is not None and bon.get("wave") is not None \
+                and len(bon["wave"]):
+            w = np.asarray(bon["wave"], np.float32)
+            if guard is not None:
+                try:
+                    _tg2, _fr2, _pl2 = timed_script.render(out["script"], speed=speed)
+                    w, arep = align_engine.trim(w, tts.sr, _tg2, _pl2,
+                                                STATE["aligner"])
+                    bon["align"] = arep
+                except Exception as e:
+                    print(f"[align] best-of trim skipped: {e}", flush=True)
+            payload = {k: v for k, v in bon.items() if k != "wave"}
+            yield _ev({"type": "best_of", **payload})
+            first = True
+            step = int(tts.sr * 0.2)
+            for off in range(0, len(w), step):
+                chunk = w[off:off + step]
+                if first:
+                    first = False
+                    yield _ev({"type": "start", "sr": tts.sr,
+                               "ttfa_server_ms": round(
+                                   (time.time() - t_req) * 1000, 1),
+                               "best_of": bon["n"]})
+                take.append(chunk)
+                yield _pcm(chunk)
+            dur = len(w) / float(tts.sr)
+            yield _ev({"type": "end", "audio_sec": round(dur, 3),
+                       "gpu_total_ms": bon["ms"], "best_of": bon["n"],
+                       "loras": [{"name": n, "lam": l} for n, l in specs],
+                       "align": bon.get("align"),
+                       "rtf": round((bon["ms"] / 1000.0) / dur, 3) if dur else None})
+            return
 
         # If the client goes away mid-reply — tab closed, connection dropped — the
         # producer thread would otherwise block forever handing the next chunk to
