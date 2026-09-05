@@ -65,11 +65,24 @@ that was asked for (+0.019 clap, about a fifth of the ungiuded value) and
 genuineness (+0.25 to +0.32). It costs word error — from 0.006 to 0.049 at g=3,
 still low in absolute terms — and about 40 % more wall clock.
 
-**3.0 and 4.0 are not distinguishable here.** Identical clap, genuineness
-slightly better at 4.0 and blend slightly worse, word error lower at 4.0 than at
-3.0 which is the wrong way round for a monotone effect. Four scripts and one
-seed cannot separate them; what the table does establish is that both differ from
-off, and in the intended direction.
+**3.0 and 4.0 are not distinguishable here**, but not for the reason the table
+first appeared to give. Printed to three decimals both showed `clap +0.108`,
+which looks like a broken switch. It is not: the generated audio differs between
+the two settings (verified by hashing it) and reproduces exactly when a setting
+is repeated. At six decimals the same measurement reads
+
+| g | word error | clap | genuineness | blend |
+|--:|--:|--:|--:|--:|
+| 3.0 | 0.01953 | +0.103553 | 1.0807 | 5.4840 |
+| 4.0 | 0.02148 | +0.086408 | 1.1882 | 6.0212 |
+
+so it was rounding, and the two settings are simply close.
+
+What separates them is **smaller than the run-to-run variation**: the same g=3.0
+measured `clap +0.108, genuineness 1.23` in one run and `+0.1036, 1.08` in the
+next. Four scripts at one seed cannot resolve a difference of that size. What
+the comparison does establish is that both differ from guidance off, in the
+intended direction.
 
 The `reward` column is deliberately not compared across settings: it is
 normalised *within* a candidate set, so a mean reward at one guidance value says
