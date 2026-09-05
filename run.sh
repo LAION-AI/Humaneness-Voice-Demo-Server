@@ -25,7 +25,7 @@ start_llm() {
   CUDA_VISIBLE_DEVICES="$MOSS_LLM_GPU" "$LLAMA" \
     --model "$GGUF" --mmproj "$MMPROJ" --alias gemma-4-12b-it-qat \
     --host 127.0.0.1 --port "$LLM_PORT" \
-    --n-gpu-layers 999 --ctx-size 8192 --batch-size 512 \
+    --n-gpu-layers 999 --ctx-size ${MOSS_LLM_CTX:-16384} --batch-size 512 \
     --parallel 1 --flash-attn on --no-warmup \
     --reasoning off --reasoning-budget 0 "$@"
 }

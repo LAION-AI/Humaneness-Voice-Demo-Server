@@ -742,6 +742,86 @@ class LLMAgent:
         except Exception:
             return False
 
+
+    # ------------------------------------------------------------ context ----
+    # The local prose prompt is 6,917 tokens of an 8,192 window, which leaves
+    # 763 for the persona, the history and the message.  Anything that pushes
+    # past it comes back as a bare "400 Bad Request" with no explanation.  So
+    # measure before sending, and drop history rather than fail.
+    _ctx = None
+    _tok_cache = {}
+
+    async def _n_ctx(self, refresh=False):
+        if self.hosted_model:
+            return None
+        if refresh:
+            # the language model server can be restarted with a bigger window
+            # while this process keeps running; never trust a stale reading
+            # when the alternative is refusing a turn
+            LLMAgent._ctx = None
+        if self._ctx is None:
+            try:
+                r = await self.client.get(f"{self.base}/props", timeout=5.0)
+                g = r.json().get("default_generation_settings") or {}
+                LLMAgent._ctx = int(g.get("n_ctx") or 0) or None
+            except Exception:
+                LLMAgent._ctx = 0          # asked once, unavailable; do not retry
+        return self._ctx or None
+
+    async def _count(self, text):
+        """Tokens by the model's own tokeniser, cached for the system prompt."""
+        key = hash(text)
+        if key in self._tok_cache:
+            return self._tok_cache[key]
+        try:
+            r = await self.client.post(f"{self.base}/tokenize",
+                                       json={"content": text}, timeout=20.0)
+            n = len(r.json().get("tokens") or [])
+        except Exception:
+            n = max(1, len(text) // 4)     # a rough estimate is better than none
+        if len(text) > 4000:               # only the big, stable ones are cached
+            self._tok_cache[key] = n
+        return n
+
+    async def _fit(self, msgs, max_tokens):
+        """Drop the oldest history until the request fits the window."""
+        ctx = await self._n_ctx()
+        if not ctx:
+            return msgs, max_tokens
+        margin = 64                        # chat template, role markers, slack
+        counts = [await self._count(m["content"]) for m in msgs]
+        need = sum(counts) + margin + max_tokens
+        if need <= ctx:
+            return msgs, max_tokens
+        dropped = 0
+        # index 0 is the system prompt and the last is the current message;
+        # everything between is history, oldest first
+        while need > ctx and len(msgs) > 2:
+            need -= counts.pop(1)
+            msgs.pop(1)
+            dropped += 1
+        if dropped:
+            print(f"[ctx] dropped {dropped} history turn(s) to fit {ctx} tokens",
+                  flush=True)
+        if need > ctx:
+            fresh = await self._n_ctx(refresh=True)
+            if fresh and fresh > ctx:
+                print(f"[ctx] window grew {ctx} -> {fresh}", flush=True)
+                ctx = fresh
+        if need > ctx:
+            # nothing left to drop: buy room from the answer instead
+            room = ctx - (sum(counts) + margin)
+            if room >= 192:
+                print(f"[ctx] system+message leaves {room} tokens; "
+                      f"capping the answer at that", flush=True)
+                return msgs, room
+            raise RuntimeError(
+                f"the prompt does not fit: system+message is "
+                f"{sum(counts)} tokens of a {ctx} window, leaving {room} for the "
+                f"answer. Raise --ctx-size on the language model server, or use "
+                f"the compact 'codes' style.")
+        return msgs, max_tokens
+
     async def turn(self, message, history=None, max_tokens=512, persona=None,
                    heard=None, identity=None):
         """One acting turn -> (parsed dict, latency ms, raw text)."""
@@ -786,6 +866,7 @@ class LLMAgent:
             message = (message + "\n\n[heard in their voice: " + heard +
                        " — respond to how they sound, never mention this note]")
         msgs.append({"role": "user", "content": message})
+        msgs, max_tokens = await self._fit(msgs, max_tokens)
 
         body = {
             "model": self.model,
@@ -829,7 +910,12 @@ class LLMAgent:
         r = await self.client.post(f"{self.base}/v1/chat/completions",
                                    json=body, headers=headers)
         ms = (time.time() - t0) * 1000
-        r.raise_for_status()
+        if r.status_code >= 400:
+            # A bare "400 Bad Request" says nothing; llama.cpp puts the actual
+            # reason in the body, and for this server it is almost always the
+            # context window.
+            detail = r.text[:400].replace("\n", " ")
+            raise RuntimeError(f"{self.backend} {r.status_code}: {detail}")
         j = r.json()
         if not j.get("choices"):
             raise RuntimeError(
