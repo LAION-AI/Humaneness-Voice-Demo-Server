@@ -447,7 +447,38 @@ occupy 8.8 MB.
 | `steer_engine.py` | the steering vectors and their injection points |
 | `setup/` | corpus extraction, retrieval index, profile traits, the steering pack, `check_levers.py` |
 | `eval/` | consistency and completeness checks |
+| `wikiskills/` | the conditioning recipes this server's prompts are built from — one pattern page per emotion, VoiceNet dimension and vocal burst, plus `coefficients.json`, which `config.py` reads via `WIKI_COEFFICIENTS` |
+| `wikiskills_legacy/` | the same tree as it stood before the 2026-09-04 vocal-burst revision, kept so an older result can be traced to the table that produced it |
 | `docs/` | [`ADAPTERS.md`](docs/ADAPTERS.md) (the adapter protocol), [`LEVERS.md`](docs/LEVERS.md) (the generation modes), generated defaults, verbatim system prompts, measurement log |
+
+---
+
+## The conditioning recipes
+
+`wikiskills/` holds what the director is allowed to ask for and what it costs. One page per
+emotion, per VoiceNet dimension and per vocal burst, each naming the adapter, the merge weight,
+the prompt form and the measured outcome; `coefficients.json` is the machine-readable half that
+`config.py` picks up through `WIKI_COEFFICIENTS`.
+
+The vocal-burst half was re-measured on 4 September 2026 against a rebuilt detector. Three
+things in it are worth knowing before you rely on a row:
+
+- **The rows say "a good setting", not "the best".** Re-scoring identical audio on a second
+  detector moves the argmax cell for 14 of 16 checkable classes, yet the cost of keeping either
+  instrument's pick is symmetric — median 0.083 against a seed-noise standard deviation of
+  0.068. Neither detector has the better recipe, so a superlative would have been a claim the
+  data does not carry. **Candidate count (best-of-N) is the larger lever** and each page says
+  how many to draw.
+- **A low hit rate can be the instrument, not the adapter.** The detector recalls `relief_sigh`
+  at 6.2 % and `heavy_breathing` at 12.0 % on real speech, so those classes cannot *exhibit* a
+  higher rate however good the adapter is. Such rows are carried at family level with the
+  reason printed rather than dropped.
+- **Nine burst classes reach a strict hit rate of 0.15 or better; 21 do at group level.** The
+  rest are honest negatives — for several of them, nothing tried so far works at all.
+
+`wikiskills_legacy/` is the pre-revision snapshot. Exactly 33 of 101 files differ between the
+two trees, all of them vocal-burst pages; emotions, VoiceNet dimensions, `interactions.md` and
+`coefficients.json` are byte-identical, so anything reading those can use either directory.
 
 ---
 
