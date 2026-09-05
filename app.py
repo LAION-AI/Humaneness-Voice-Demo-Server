@@ -341,8 +341,10 @@ def adapters():
                           for n in sorted(config.QUALITY_LORAS)
                           if n in lb.repos]})
     out.append({"kind": "sft3_qdpo", "title": "Preference adapters",
-                "note": "Quality DPO is on at 1.0; burst+stop is off until "
-                        "somebody has listened to it. Neither has been heard.",
+                "note": f"Quality DPO is on at "
+                        f"{config.QDPO_LORAS['sft3_qdpo:quality_dpo']}; "
+                        f"burst+stop is off until somebody has listened to it. "
+                        f"Neither has been heard.",
                 "items": [{"name": n, "label": config.QDPO_LABELS.get(n, n),
                            "default": config.QDPO_LORAS.get(n, 0.0), "max": 2.0}
                           for n in config.QDPO_LORAS if n in lb.repos]})
@@ -353,15 +355,20 @@ def adapters():
                            "hint": config.SFT3_VN_ADAPTERS.get(n, ""),
                            "default": 0.0, "max": 2.0} for n in group("sft3_voicenet")]})
     out.append({"kind": "sft3_emotion", "title": "Emotions",
-                "note": "The retrieval picks one per turn at 1.5. A slider adds "
-                        "or replaces it.",
+                "note": f"The retrieval picks one per turn at "
+                        f"{config.SFT3_EMOTION_LAM}. A slider adds or replaces "
+                        f"it.",
                 "items": [{"name": f"sft3_emotion:{n}", "label": n.replace("_", " "),
                            "default": 0.0, "max": 2.0} for n in group("sft3_emotion")]})
     out.append({"kind": "burst", "title": "Vocal bursts",
-                "note": f"Added automatically when the script contains one, at "
-                        f"{config.BURST_LAM} ({config.BURST_LAM_INTENSE} standing alone).",
+                "note": "Added automatically when the script contains one. With "
+                        "skills on, at the weight measured for that class "
+                        "(0.25-2.3); a class with no measured recipe falls back "
+                        f"to {config.BURST_LAM} "
+                        f"({config.BURST_LAM_INTENSE} standing alone).",
                 "items": [{"name": f"burst:{n}", "label": n.replace("_", " "),
-                           "default": 0.0, "max": 1.5} for n in group("burst")]})
+                           "default": 0.0, "max": config.BURST_LAM_MAX}
+                          for n in group("burst")]})
     return {"groups": out,
             "always": [{"name": config.SFT3_DPO_LORA, "label": "Quality (DPO p2)",
                         "default": config.SFT3_DPO_LAM},
@@ -898,17 +905,27 @@ async def turn(req: Request):
                 specs = [s for s in specs if not s[0].startswith("emotion:")] + emo_spec
 
         # Per-class burst weights.  The flat 0.25 / 0.5 was a conservative guess
-        # made when seven adapters existed; the measured optimum is per class and
-        # runs 0.25 to 2.3, and for several classes the shipped dose sat well
-        # under it.  Only applied with skills on, so the two are comparable.
+        # made when seven adapters existed, and it was capped by a genuineness
+        # gate that has since been dropped on purpose; the measured optimum is
+        # per class and runs 0.25 to 2.3, so for most classes the shipped dose
+        # sat well under it.  The wiki is the source of truth where it has a
+        # measured recipe; the flat default stays the fallback for a class it has
+        # never measured.  Only applied with skills on, so the two are comparable.
         if use_skills:
             try:
                 import skills as _sk
                 _s = _sk.load()
                 if _s is not None and _s.ok:
-                    specs = [((n, _s.weight_for(n.split(":", 1)[-1], l))
-                              if n.startswith("burst:") else (n, l))
-                             for n, l in specs]
+                    _cap = config.BURST_LAM_MAX
+
+                    def _burst_lam(name, flat):
+                        # `weight_for` returns the flat default unchanged when the
+                        # class has no measured recipe, so the cap only ever bites
+                        # on a measured weight.
+                        return min(_s.weight_for(name.split(":", 1)[-1], flat), _cap)
+
+                    specs = [((n, _burst_lam(n, l)) if n.startswith("burst:")
+                              else (n, l)) for n, l in specs]
             except Exception as e:
                 print(f"[skills] burst weights unchanged: {e}", flush=True)
 

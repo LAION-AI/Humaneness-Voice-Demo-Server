@@ -524,12 +524,40 @@ QUALITY_LABELS = {
     "sft3_quality:blend_high":       "Burst blend",
     "sft3_quality:esthetics_high":   "Aesthetics",
 }
-# Burst adapters are a colour on top of a sound the model already makes, so they
-# are dosed low: a burst that is merely present gets 0.25, one the director
-# marked as intense gets 0.5.  Higher starts to drag the whole line towards the
-# burst.
+# Burst adapter dose.  THESE TWO ARE THE FALLBACK, NOT THE USUAL CASE: with
+# skills on (the default) every class that has a measured weight in
+# `wikiskills/VOCAL_BURSTS.md` gets that weight instead, per class, applied in
+# app.py.  These flat numbers are what a class with no measured recipe gets, and
+# what every class gets when MOSS_SKILLS=0.
+#
+# The old comment here said 0.25 was chosen because "higher starts to drag the
+# whole line towards the burst".  That reasoning predates the measurement and is
+# retired: 0.25 was in fact the ceiling the *genuineness* gate imposed, and that
+# gate has since been dropped on purpose — a scream is not supposed to sound like
+# a composed, natural address, so falling genuineness is the expected price of a
+# burst and not grounds for exclusion.  The gate that remains is word error:
+# paired Parakeet WER no more than +0.104 against the class's own w = 0 cell,
+# and for inline scripts no more than 0.25 absolute.
+#
+# Measured per-class optima now run 0.25 to 2.3 (VOCAL_BURSTS.md §51/52 + §64),
+# i.e. the shipped flat dose sat far under the optimum for most classes:
+# `chuckle` alone goes 0.25 -> 2.0.
 BURST_LAM = float(os.environ.get("MOSS_BURST_LAM", "0.25"))
 BURST_LAM_INTENSE = float(os.environ.get("MOSS_BURST_LAM_INTENSE", "0.5"))
+# Ceiling applied to a per-class weight after it is looked up.  2.3 is the
+# largest weight any recipe names, so the default changes nothing.
+#
+# It is a knob rather than a fixed clamp because the evidence is not settled.
+# The 2026-09-05 addendum (study `vb_grp`, 28 classes, group-level detector)
+# measured all four adapter arms breaking the WER gate at w = 2.0 — retrained
+# +0.167, borrowed +0.168, group-full +0.123, group-25% +0.109 against the
+# +0.104 bound — and states that no recipe should name w = 2.0.  The §51/52
+# table it sits above has not been rewritten to match and still carries ten
+# recipes at 1.8-2.3, which is what skills.py parses and serves.  Those cells
+# have their own passing absolute WER (sharp_inhale at 2.3 measured 0.091), so
+# the two are not flatly contradictory; they are a different harness measuring a
+# different delta.  Set MOSS_BURST_LAM_MAX=1.5 to enforce the addendum's ceiling.
+BURST_LAM_MAX = float(os.environ.get("MOSS_BURST_LAM_MAX", "2.3"))
 
 # ---------------------------------------------------------------- generation modes
 # THE THREE LEVERS.  Until now this server had exactly one way to shape a performance:

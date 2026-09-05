@@ -337,3 +337,45 @@ Diese fünf lesen auf **Gruppenebene** deutlich besser; genau das ist das Argume
 die Gruppen, und es ist ein Argument über das *Messen*, nicht über das Erzeugen.
 
 <!-- /vb_grp:2026-09-05 -->
+
+<!-- links:2026-09-05 -->
+
+## Wo die Adapter liegen
+
+| Satz | Repository | was drin ist |
+|---|---|---|
+| **neu, v2** | [`laion/moss-va-sft3-vocal-burst-lora-adapters-v2`](https://huggingface.co/laion/moss-va-sft3-vocal-burst-lora-adapters-v2) | 105 Adapter: 45 pro Klasse, 30 pro Gruppe, dazu Ablations- und Dosis-Arme als Beleg |
+| ausgeliefert | [`laion/moss-va-sft3-vocal-burst-lora-adapters`](https://huggingface.co/laion/moss-va-sft3-vocal-burst-lora-adapters) | 71 Adapter, die Rückfallvariante |
+
+`index.json` im v2-Satz nennt zu jedem Adapter die Zeilenzahl und den synthetischen Anteil.
+Jede `vb-*.md` verlinkt unten den für sie zuständigen Adapter direkt.
+
+## Cues immer auf Englisch
+
+**Auch wenn der gesprochene Text deutsch ist.** Nachgeprüft am Korpus, nicht behauptet: die
+deutschen Trainingszeilen lauten `Das zerreißt einen einfach, weißt du? (relief sigh)` und
+`… sehen sie mich vielleicht endlich. (person whistling to get attention)`. Das gilt für
+Burst-Cues **und** für Regieanweisungen.
+
+Der Burst ist eine eigene Klammer; **nie eine Zahl in eine Klammer** — eine runde Klammer mit
+Zahl wird zum Burst statt zur Anweisung. Die Dauern setzt der Server. Anleitung für das
+Regie-Modell: [`docs/DIRECTOR.md`](https://github.com/LAION-AI/Humaneness-Voice-Demo-Server/blob/main/docs/DIRECTOR.md).
+
+## Zu den Gewichten über 1,5 in der Tabelle
+
+Zwölf Zeilen oben nennen ein Gewicht über 1,5, bis hinauf zu 2,3 — und der Nachtrag vom
+5. September sagt, kein Rezept solle 2,0 nennen, weil dort über 28 Klassen **alle vier**
+Adapter-Arme die WER-Schranke rissen (+0,109 bis +0,168 gegen +0,104).
+
+**Das ist ein echter Widerspruch, und er wird hier nicht durch Löschen aufgelöst.** Die beiden
+Zahlen stammen aus verschiedenen Studien: die Tabellenwerte aus einem Sweep über die *Prompt-Form*,
+bei dem die WER **jeder einzelnen Zelle** geprüft wurde und bestand (`sharp_inhale` bei w = 2,3
+liegt bei 0,091); der Nachtrag misst gepaart über viele Klassen auf einem anderen Trägersatz.
+Die guten Rezepte auf schwächerer Evidenz zu verwerfen wäre falsch — `chuckle` bei w = 2,0 ist
+mit 0,73 das beste Rezept im ganzen Satz.
+
+**Praktisch:** wer die Einzelzelle nicht selbst nachgemessen hat, bleibt bei 1,5. Der Server
+kennt dafür `MOSS_BURST_LAM_MAX`; auf 1,5 gesetzt erzwingt es die Regel des Nachtrags, in der
+Vorgabe serviert er die gemessenen Werte.
+
+<!-- /links:2026-09-05 -->
