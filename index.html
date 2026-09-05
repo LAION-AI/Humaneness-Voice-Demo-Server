@@ -242,6 +242,8 @@
       <input type="checkbox" id="pure"> Pure <i>(Basis + Referenz)</i></label>
     <label title="Die Regieanweisungen waehlen per Retrieval einen Emotions-Adapter, gemergt mit dem publizierten Wert 1.5. Aus: nur SFT3-Basis + abgerufener Referenzclip.">
       <input type="checkbox" id="emonuance" checked> Emotions-Nuancen <i>(Adapter @1.5)</i></label>
+    <label title="Gemessene Burst-Rezepte statt handgeschriebener Regeln: nur Klangklassen, die nachweislich realisieren, mit dem je Klasse gemessenen Merge-Gewicht, plus die gemessenen Platzierungs- und Formulierungsregeln. Aus = die alten Regeln.">
+      <input type="checkbox" id="skills" checked> Neue Skills <i>(gemessene Bursts)</i></label>
     <label title="Forced Alignment gegen das Skript: einblenden bis zum ersten Wort, nach dem letzten Wort ausblenden und abschneiden. Beginnt das Skript mit einem Vocal Burst, bleibt der Anfang unberuehrt.">
       <input type="checkbox" id="align" checked> Ende beschneiden <i>(Alignment)</i></label>
     <label title="Preference-Adapter step376. Die Praeferenzaufgabe ist dort geloest; spaetere Schritte vergroessern nur die Marge. Von niemandem gehoert.">
@@ -532,6 +534,7 @@ async function send(){
                             stop_bias: parseFloat($('stopb').value),
                             gen_mode: $('cfg').checked ? 'adapter+cfg' : 'adapter',
                             align: $('align').checked,
+                            skills: $('skills').checked,
                             qdpo_lams: {
                               'sft3_qdpo:quality_dpo':
                                   $('qdpo').checked ? parseFloat($('qdpos').value) : 0,

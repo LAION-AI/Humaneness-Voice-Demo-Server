@@ -110,16 +110,24 @@ def _boot():
         STATE["codebook"] = cb
         # one agent per (brain, prompt style); they share the http client cost
         # only at construction, so building all four up front keeps switching free
+        # one agent per (brain, prompt style, skills on/off).  The skills flag
+        # changes only the system prompt, so building both is a string apiece
+        # and lets the two be compared without a restart.
+        import skills as _skills
+        _skills.load()
         for be in ("local",) + tuple(config.HOSTED_MODELS):
             for st in ("prose", "codes"):
-                try:
-                    STATE["agents"][(be, st)] = LLMAgent(
-                        cat, descriptions=desc, backend=be, style=st,
-                        codebook=cb, bursts=burst_cues)
-                except Exception as e:
-                    print(f"[app] agent {be}/{st} unavailable: {e}", flush=True)
-        STATE["agent"] = STATE["agents"].get((config.DEFAULT_BRAIN, "codes")) \
-            or STATE["agents"][("local", "prose")]
+                for sk in (True, False):
+                    try:
+                        STATE["agents"][(be, st, sk)] = LLMAgent(
+                            cat, descriptions=desc, backend=be, style=st,
+                            codebook=cb, bursts=burst_cues, use_skills=sk)
+                    except Exception as e:
+                        print(f"[app] agent {be}/{st}/skills={sk} unavailable: {e}",
+                              flush=True)
+        STATE["agent"] = STATE["agents"].get(
+            (config.DEFAULT_BRAIN, "codes", config.SKILLS_ON)) \
+            or STATE["agents"][("local", "prose", True)]
         STATE["profiles"] = voice_profiles.discover()
         for _v, _p in STATE["profiles"].items():      # own matrix beats borrowing
             _p["has_conditions"] = _p["has_conditions"] or bank.has_matrix(_v)
@@ -590,7 +598,8 @@ async def turn(req: Request):
     # expanded procedurally.  Costs output tokens, buys direction that is written
     # for this moment rather than assembled from a table.
     st = "codes" if str(body.get("prompt_style")) == "codes" else "prose"
-    agent = STATE["agents"].get((be, st)) or STATE["agent"]
+    use_skills = body.get("skills", config.SKILLS_ON) is not False
+    agent = STATE["agents"].get((be, st, use_skills)) or STATE["agent"]
     persona = personas.brief_for(body.get("persona"), body.get("persona_custom"))
     persona_loras = personas.loras_for(body.get("persona"),
                                        body.get("persona_custom"))
@@ -888,6 +897,21 @@ async def turn(req: Request):
                 # weights; on sft3 the matching set is the one trained with it
                 specs = [s for s in specs if not s[0].startswith("emotion:")] + emo_spec
 
+        # Per-class burst weights.  The flat 0.25 / 0.5 was a conservative guess
+        # made when seven adapters existed; the measured optimum is per class and
+        # runs 0.25 to 2.3, and for several classes the shipped dose sat well
+        # under it.  Only applied with skills on, so the two are comparable.
+        if use_skills:
+            try:
+                import skills as _sk
+                _s = _sk.load()
+                if _s is not None and _s.ok:
+                    specs = [((n, _s.weight_for(n.split(":", 1)[-1], l))
+                              if n.startswith("burst:") else (n, l))
+                             for n, l in specs]
+            except Exception as e:
+                print(f"[skills] burst weights unchanged: {e}", flush=True)
+
         # The overlay's sliders: a full adapter name mapped to a weight.  0 means
         # "leave it to the director", which is not the same as forcing it off —
         # the director's own picks stay unless a slider names them.
@@ -973,7 +997,7 @@ async def turn(req: Request):
                    "speed": out.get("speed"), "style": out.get("style"),
                    "brain": be, "prompt_style": st, "codes": out.get("codes"),
                    "profile": prof["id"] if prof else None,
-                   "pure": pure, "char_lora": want_char,
+                   "pure": pure, "char_lora": want_char, "skills": use_skills,
                    "retrieval": ({"direction": retr.get("direction"),
                                   "emotion": retr.get("emotion"),
                                   "emotions": retr.get("emotions", [])[:3],

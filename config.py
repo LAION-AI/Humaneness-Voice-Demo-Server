@@ -738,3 +738,13 @@ ALIGN_QWEN_DEVICE = os.environ.get("MOSS_ALIGN_QWEN_DEVICE", "cuda:1")
 # Structural sanity bound: no single word lasts this long in ordinary speech, so
 # a span longer than it means the alignment collapsed rather than fitted.
 ALIGN_QWEN_MAX_WORD_S = float(os.environ.get("MOSS_ALIGN_QWEN_MAX_WORD", "3.0"))
+
+# ---------------------------------------------------------------- wikiskills
+# The generated knowledge layer.  `coefficients.json` in here is what levers.py
+# reads; `VOCAL_BURSTS.md` is what the director reads, via skills.py.
+SKILLS_DIR = os.environ.get("MOSS_SKILLS_DIR", "/mnt/nvme/moss-15-v2-assets/wikiskills")
+SKILLS_ON = os.environ.get("MOSS_SKILLS", "1") not in ("0", "false", "")
+# Do not offer a burst class whose measured family hit rate is below this.  The
+# study's own shipping bar; under it a request is more likely to produce nothing
+# than the sound asked for.
+SKILLS_MIN_HIT = float(os.environ.get("MOSS_SKILLS_MIN_HIT", "0.15"))

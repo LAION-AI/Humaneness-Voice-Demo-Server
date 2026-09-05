@@ -562,8 +562,14 @@ def build_code_schema(catalog):
 
 class LLMAgent:
     def __init__(self, catalog, base=None, model=None, descriptions=None,
-                 backend="local", style="prose", codebook=None, bursts=None):
+                 backend="local", style="prose", codebook=None, bursts=None,
+                 use_skills=None):
         self.backend = backend
+        # The measured burst layer replaces the hand-written one.  Kept as a
+        # switch rather than a replacement so the two can be compared by ear:
+        # the old block told the director to place bursts mid-sentence, which
+        # the measurements make worse on 15 of 15 classes.
+        self.use_skills = config.SKILLS_ON if use_skills is None else bool(use_skills)
         self.hosted_model = None
         self.style = style
         self.codebook = codebook
@@ -581,7 +587,7 @@ class LLMAgent:
         if style == "codes" and codebook is not None:
             self.schema = build_code_schema(catalog)
             self.system = CODE_SYSTEM + "\n\n" + codebook.legend() \
-                + _burst_block(bursts)
+                + self._bursts(bursts)
             if self.hosted_model:
                 self.system += ("\n\nReturn a JSON object with exactly the keys "
                                 "d, l, sp, s.")
@@ -591,7 +597,7 @@ class LLMAgent:
                            + json.dumps(VOICE_TOOL, indent=1) + "\n"
                            + json.dumps(PERFORM_TOOL, indent=1)
                            + "\n" + render_catalog(catalog, descriptions or {})
-                           + _burst_block(bursts))
+                           + self._bursts(bursts))
             if self.hosted_model:
                 # A truncated dump of the schema properties used to go here, and
                 # the enums of "voice" and "voice2" alone overran the 1800-char
@@ -619,6 +625,21 @@ class LLMAgent:
                     ' "delivery": "<the GENERAL voice description, prose>",\n'
                     ' "script": "<the spoken line with its inline cues>"}\n'
                     'Only keys from "voice"/"voice2" that the chosen mode needs must be filled.')
+
+    def _bursts(self, bursts):
+        """The measured block when skills are on, the original otherwise."""
+        if self.use_skills:
+            try:
+                import skills
+                sk = skills.load()
+                if sk is not None and sk.ok:
+                    have = [n for n, _ in (bursts or [])]
+                    blk = sk.prompt_block(have)
+                    if blk:
+                        return blk
+            except Exception as e:
+                print(f"[skills] block failed, using the original: {e}", flush=True)
+        return _burst_block(bursts)
 
     async def health(self):
         # Only the local llama.cpp server exposes /health; the hosted endpoint

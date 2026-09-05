@@ -123,7 +123,7 @@ environment variable too, so nothing here needs a code edit to change.
 | `CONTINUITY` | `the same speaker continues without interruption: identical voice, identical person, same microphone and same room.` |
 | `DELIVERY_LEVER` | `adapter` |
 | `EIV_DIR` | `/mnt/nvme/empathic-insights-voice-small` |
-| `EMOTION_NAMES` | `{'Emotional_Numbness', 'Fear', 'Bitterness', 'Thankfulness_Gratitude', 'Disappointment', 'Distress', 'Hope_Enthusiasm_Optimism', 'Disgust', 'Shame', 'Embarrassment', 'Intoxication_Altered_States_of_Co …` |
+| `EMOTION_NAMES` | `{'Sexual_Lust', 'Helplessness', 'Anger', 'Sadness', 'Impatience_and_Irritability', 'Teasing', 'Distress', 'Doubt', 'Fatigue_Exhaustion', 'Relief', 'Contempt', 'Infatuation', 'Longing', 'Intoxication_A …` |
 | `GEN_MODE` | `adapter` |
 | `HISTORY_TURNS_LOCAL` | `8` |
 | `HISTORY_TURNS_LUNA` | `40` |
@@ -150,6 +150,9 @@ environment variable too, so nothing here needs a code edit to change.
 | `SIDON_GPU` | `0` |
 | `SIDON_OUT_SR` | `48000` |
 | `SIDON_SRC` | `/mnt/nvme/moss-15-v2-assets/sidon/src` |
+| `SKILLS_DIR` | `/mnt/nvme/moss-15-v2-assets/wikiskills` |
+| `SKILLS_MIN_HIT` | `0.15` |
+| `SKILLS_ON` | `True` |
 | `SPEAKER_IDENTITY` | `the voice of one man in his early fifties. a warm, unhurried baritone that sits low and forward in the chest, like aged oak and morning mist. the timbre is dark and resonant with a soft gravel at the  …` |
 | `SPEEDS` | `(0.5, 0.75, 1.0, 1.25, 1.5)` |
 | `SPEED_WORDS` | `{'much_slower': 0.5, 'slower': 0.75, 'normal': 1.0, 'faster': 1.25, 'much_faster': 1.5}` |

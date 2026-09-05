@@ -547,6 +547,16 @@ See [`docs/EXPERIMENTS.md`](docs/EXPERIMENTS.md) for the method, all prompts, al
 hyper-parameters and the full tables, and `eval/results/` for the raw per-take
 data including every transcript.
 
+## The measured knowledge layer
+
+`wikiskills/` holds what the experiments established, generated rather than
+typed. `skills.py` reads its burst tables and uses them: it stops offering the
+**36 of 71** burst classes measured never to realise, merges each burst at the
+weight measured for that class rather than a flat 0.25, and replaces the
+hand-written placement advice — which told the director to do the one thing
+measured to hurt. Checkbox in the page, on by default. See
+[`docs/SKILLS.md`](docs/SKILLS.md).
+
 ## End-trimming
 
 Takes sometimes said the line and then kept going. The audio always matched the
