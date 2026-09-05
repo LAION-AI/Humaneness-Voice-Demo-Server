@@ -628,17 +628,44 @@ async function send(){
             history.push({role:'user',content:text});
             history.push({role:'assistant',content:ev.reply});
           } else if(ev.type === 'best_of'){
+            // Every candidate gets a player, best first.  Only rank 0 plays by
+            // itself — it is the one the stream is already carrying; the rest
+            // are here to be checked against it, which is the only way to find
+            // out whether the reward agrees with an ear.
             const cs = (ev.candidates||[]).slice().sort((a,b)=>a.rank-b.rank);
             const d = document.createElement('details'); d.className='cues';
-            d.innerHTML = '<summary>Best-of-' + ev.n + ' · g=' + ev.guidance +
-              ' · ' + (ev.ms/1000).toFixed(1) + ' s</summary><pre>' +
-              'rang  reward  gate    wer   genuine  blend   clap\n' +
-              cs.map(c => String(c.rank).padEnd(4) + '  ' +
-                c.reward.toFixed(3).padStart(6) + '  ' + c.gate.toFixed(2) + '  ' +
-                c.wer.toFixed(3).padStart(5) + '  ' + c.genuineness.toFixed(2).padStart(6) +
-                '  ' + c.blend.toFixed(2).padStart(5) + '  ' + c.clap.toFixed(3).padStart(6)
-              ).join('\n') + '</pre>';
+            d.open = true;
+            const h = document.createElement('summary');
+            h.textContent = 'Best-of-' + ev.n + ' · g=' + ev.guidance +
+                            ' · ' + (ev.ms/1000).toFixed(1) + ' s';
+            d.appendChild(h);
+            for(const c of cs){
+              const row = document.createElement('div');
+              row.style.cssText = 'margin:6px 0 2px;padding-top:6px' +
+                (c.rank ? ';border-top:1px solid var(--line)' : '');
+              const tag = document.createElement('div');
+              tag.style.cssText = 'font:11.5px var(--mono);color:var(--dim);' +
+                                  'display:flex;gap:10px;flex-wrap:wrap';
+              tag.innerHTML =
+                '<b style="color:' + (c.rank ? 'var(--dim)' : 'var(--accent)') +
+                '">#' + c.rank + (c.rank ? '' : ' · gespielt') + '</b>' +
+                '<span>reward <b style="color:var(--fg)">' + c.reward.toFixed(3) + '</b></span>' +
+                '<span>wer ' + c.wer.toFixed(3) + '</span>' +
+                '<span>genuine ' + c.genuineness.toFixed(2) + '</span>' +
+                '<span>blend ' + c.blend.toFixed(2) + '</span>' +
+                '<span>clap ' + c.clap.toFixed(3) + '</span>';
+              row.appendChild(tag);
+              d.appendChild(row);
+              if(c.pcm){
+                const raw = atob(c.pcm);
+                const buf = new Uint8Array(raw.length);
+                for(let i=0;i<raw.length;i++) buf[i]=raw.charCodeAt(i);
+                attachPlayer(row, [new Int16Array(buf.buffer)], ev.sr||48000,
+                             c.sec, null);
+              }
+            }
             if(node) node.appendChild(d);
+            chat.scrollTop = chat.scrollHeight;
           } else if(ev.type === 'start'){
             startEv = ev; sr = ev.sr || 48000;
             if(ev.prompt && window._lastDet){

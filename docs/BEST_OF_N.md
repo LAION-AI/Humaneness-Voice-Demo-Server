@@ -106,6 +106,22 @@ nothing about another. Only the raw terms are comparable.
 * **N is not free of the director.** Every candidate speaks the same script; the
   variation is in the performance, not the words.
 
+## Checking the ranking by ear
+
+**Every candidate is playable, best first.** The winner streams and plays by
+itself, as any turn does; the rest appear underneath it as their own players,
+each labelled with its rank and its four numbers.
+
+This is deliberately not a debug switch that has to be turned on. The whole
+reward is one model scoring another model's output, and the question that
+matters — whether rank 0 is the take a person would have chosen — cannot be
+answered from the numbers at all. Hearing rank 3 beat rank 0 is the finding; a
+ranking nobody can listen to is an assertion.
+
+Cost: the candidates travel as PCM in the `best_of` event, about 14 MB for eight
+takes of 13 seconds. `best_of_audio: false` in the request drops them and leaves
+the ranking, for a caller that only wants the winner.
+
 ## Using it
 
 Checkbox and an N slider (2–12) in the chat page, off by default;

@@ -1221,6 +1221,22 @@ async def turn(req: Request):
                       f"{cands[best]['reward']:.3f} (wer {cands[best]['wer']:.3f})",
                       flush=True)
                 bon["wave"] = waves[best]
+                # Every candidate travels with the ranking so they can be
+                # compared by ear.  The reward is a model scoring another
+                # model's output, and the only way to find out whether rank 0
+                # is really the best take is to listen to the others.
+                if body.get("best_of_audio", True) is not False:
+                    import base64 as _b64
+                    order = sorted(range(len(cands)),
+                                   key=lambda i: cands[i]["rank"])
+                    for pos, i in enumerate(order):
+                        w = waves[i]
+                        if w is None or not len(w):
+                            continue
+                        pcm16 = np.clip(np.asarray(w, np.float32) * 32767,
+                                        -32768, 32767).astype("<i2").tobytes()
+                        bon["candidates"][i]["pcm"] = _b64.b64encode(pcm16).decode()
+                        bon["candidates"][i]["index"] = i
             except Exception as e:
                 import traceback
                 print(f"[bestofn] failed, falling back to streaming: "
@@ -1244,6 +1260,7 @@ async def turn(req: Request):
                 except Exception as e:
                     print(f"[align] best-of trim skipped: {e}", flush=True)
             payload = {k: v for k, v in bon.items() if k != "wave"}
+            payload["sr"] = tts.sr
             yield _ev({"type": "best_of", **payload})
             first = True
             step = int(tts.sr * 0.2)
