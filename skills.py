@@ -301,6 +301,16 @@ class Skills:
             body = m.group(1)
             if _re.search(r"[0-9]", body):          # already a burst
                 continue
+            # A bracket the renderer already reads as a burst needs no repair.
+            # Without this, "(short chuckle)" -- the length syntax the director
+            # is now allowed to use -- had a second bare "(chuckle)" inserted
+            # after it, and the line got two chuckles in a row.
+            try:
+                import timed_script as _ts
+                if _ts._is_burst_label(body):
+                    continue
+            except Exception:
+                pass
             low = body.lower()
             for lab in labels:
                 spaced = lab.replace("_", " ")

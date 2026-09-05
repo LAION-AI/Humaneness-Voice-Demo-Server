@@ -139,6 +139,68 @@ total budget is generous and only bounds the merge cost.
 > once and 0.737 the next time — and both numbers were wrong. The fixed-script
 > sweep is the one to trust.
 
+## Directions in the shape the model was trained on
+
+The round-3 prompting scheme builds a delivery direction from four pieces in a
+fixed order, and the director now writes them the same way:
+
+```
+intensity adverb + emotion name (+ second emotion) + how it is held + manner
+```
+
+Three of those were missing and are now spelled out in the prompt.
+
+**The adverb comes from a band, not from taste.** The same four bands labelled
+every training clip — `barely/faintly` for held down, `clearly/plainly` for
+plainly audible, `strongly/intensely` for running hard,
+`overwhelmingly/utterly` for at the limit.
+
+**The emotion is named in the direction**, in words, not only in GENERAL. A
+direction that says how the voice moves without saying what it feels arrives as
+manner rather than as feeling — which is exactly the failure round 2 measured
+when it dropped directions altogether and emotional control collapsed to the
+corpus median.
+
+**Whether it is let out or held in is a fork in the training data**, not a
+nuance: *"letting it out, not hiding it, unguarded"* against *"fought down
+rather than shown, held in and only leaking at the edges of phrases"*.
+
+And structurally: **only the first sentence gets the full direction**, later ones
+get a short reminder — `(still clearly amused)`, `(malicious, still kept under)`.
+A thirty-word note in front of a 0.6 second line buries the line it was meant to
+shape.
+
+Observed after the change, unprompted:
+
+```
+(clearly amused, letting it out, warm and unguarded; bright, relaxed)
+[6.1 seconds duration] The most annoying thing this week was …
+(exasperated sigh, 0.1 seconds)
+[4.2 seconds duration] It took ten minutes to fix, and three days to stop hearing about.
+```
+
+### Burst length without a number
+
+Burst durations are computed, because a number inside a round bracket is what
+separates a burst from a direction and the director cannot be given one to write.
+It can now write **`short`** or **`long`** in front of the label instead —
+`(short chuckle)`, `(long exhausted groan)` — which map to the corpus's own 10th
+and 90th percentiles, 0.14 s and 0.48 s, against a 0.28 s default. The prompt
+says plainly that long means half a second: the longest burst ever observed in
+the data is 2.46 s and the median is 0.28, so a sigh asked for at three seconds
+is outside everything the model has seen.
+
+Two bugs surfaced while checking this against the scheme:
+
+* **The language code was wrong on English lines.** `GENERAL` ended `11.8s, DE`
+  on an English take, because the German detector counted `was` — an ordinary
+  English word that is also German — and two of them were enough. `die` had the
+  same problem. The marker list now holds only words that are not also English,
+  and umlauts count double since no English word carries one.
+* **The repair inserted a second burst** when the director used the new length
+  syntax: `(short chuckle)` was not recognised as an already-complete burst, so
+  a bare `(chuckle)` was added after it and the line got two in a row.
+
 ## Cue language
 
 Cues are written in **English even when the spoken line is German**. This is the

@@ -220,19 +220,42 @@ its cues removed, so "script" must contain the complete line, exactly as you wan
 ────────────────────────────────────────────────────────
 4. "script" — the SAME words as "reply", annotated in position. This is where you direct.
    HARD RULES, measured on this model:
-   - EVERY sentence gets its own inline cue in round brackets, placed immediately BEFORE the words
-     it affects. Not one cue for the whole reply — one per sentence, and let the arc shift between
-     them. Each cue must be as strong and as physical as the delivery: "(voice cracking, forcing it
-     out through a closing throat)" directs; "(sad)" does not.
+   HOW A DELIVERY DIRECTION IS BUILT. The voice model was trained on directions with a specific
+   shape, and writing them that way is the difference between an instruction it follows and prose
+   it ignores. Four pieces, in this order:
+
+       intensity adverb + emotion name (+ optional second emotion) + how it is held + manner
+
+     "(intensely amused: letting it out, not hiding it, warm and open, unguarded; bright, relaxed)"
+     "(very malicious and a thread of jealousy. restrained and civil, the irritation tucked under
+      the words, keeping control by effort; bright, light breath)"
+
+   - THE ADVERB IS NOT DECORATION. Pick it from the band you actually mean, because the same four
+     bands were used to label every training clip:
+         barely / faintly / only slightly / just a little   the feeling is there but held down
+         clearly / plainly / noticeably / unmistakably       plainly audible, still controlled
+         strongly / intensely / very / deeply                running hard, difficult to contain
+         overwhelmingly / extremely / utterly / completely   at the limit, taking the voice over
+   - NAME THE EMOTION IN THE DIRECTION, in plain words, not just in GENERAL. A direction that says
+     only how the voice moves without saying what it feels reaches the model as manner and not as
+     feeling.
+   - SAY WHETHER IT IS LET OUT OR HELD IN. This is a real fork in the training data, not a nuance:
+     "letting it out, not hiding it, unguarded" against "fought down rather than shown, held in and
+     only leaking at the edges of phrases". Contained is usually the stronger performance.
+   - ONLY THE FIRST SENTENCE GETS THE FULL DIRECTION. Every later sentence gets a SHORT reminder —
+     "(still clearly amused)", "(keep it intensely angry, tense)", "(malicious, still kept under)",
+     "(same again, overwhelmingly aroused)". A thirty-word note in front of a 0.6 second line
+     buries the line it was meant to shape. A sentence under about two seconds can go without one.
    - Put VOCAL BURSTS in, and put them in often. Real people make these sounds constantly and they
      are the single biggest thing separating a performance from a read-aloud. Aim for at least one
      in most replies, wherever a person would actually make it. Never open or close the line with
      one, and always let words follow it.
-     PREFER THESE EXACT LABELS — they are the bursts this voice model was trained on, and a label
-     from outside the list is a coin flip: (sharp inhale), (deep breath), (surprised gasp),
-     (chuckle), (breathy giggle), (childlike giggle), (cackle), (contented sigh), (wistful sigh),
-     (exasperated sigh), (exhausted groan), (soft hum), (resonant hum), (low mumble), (ahem),
-     (yawn), (coughing), (growl), (purr), (scream), (shriek), (mournful wail).
+     A BURST IS ITS OWN BRACKET AND ITS OWN MOMENT, standing between sentences: "(chuckle)" on its
+     own, never "(clearly amused, with a chuckle)" — named inside a direction it produces no sound
+     at all, because the whole bracket is then read as an instruction about how to speak.
+     The server gives every burst its length before sending it. You may write "short" or "long" in
+     front of the label — "(long exhausted groan)", "(short chuckle)" — and nothing else: real
+     bursts in the training data run 0.14 to 0.48 seconds, so "long" is half a second, not two.
    - EVERY delivery cue names its strength with one of these adverbs, chosen for how hard the
      feeling is actually running. This is the same scale the model was trained against, so the
      word does real work:

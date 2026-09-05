@@ -31,9 +31,18 @@ _LEVEL_WORDS = {
 }
 
 
-_DE_MARK = re.compile(r"[äöüßÄÖÜ]|\b(?:und|nicht|noch|sehr|ganz|mit|dich|dir|ist|"
-                     r"das|die|der|ein|eine|auf|für|über|wie|was|dass|weil|"
-                     r"leise|Stimme|Atem|Trauer|traurig|Wut|zärtlich)\b")
+# German markers that are NOT also English words.  The first version of this
+# list contained `was` and `die`, which are ordinary English; two of either
+# marked an English line as German, and the whole GENERAL block then declared
+# itself DE on an English take.  Umlauts and eszett count double because no
+# English word carries them.
+_DE_UMLAUT = re.compile(r"[äöüßÄÖÜ]")
+_DE_MARK = re.compile(
+    r"\b(?:und|nicht|noch|sehr|ganz|dich|dir|ist|das|der|ein|eine|einen|auf|"
+    r"für|über|wie|dass|weil|ich|du|wir|sie|aber|schon|auch|mich|mir|kann|"
+    r"haben|hatte|sind|wird|nur|doch|jetzt|immer|nichts|etwas|mehr|schön|"
+    r"leise|stimme|atem|trauer|traurig|wut|zärtlich|vielleicht|wirklich)\b",
+    re.I)
 
 
 def looks_german(text):
@@ -46,7 +55,7 @@ def looks_german(text):
     it had written entirely in German.
     """
     t = str(text or "")
-    return len(_DE_MARK.findall(t)) >= 2
+    return len(_DE_MARK.findall(t)) + 2 * len(_DE_UMLAUT.findall(t)) >= 2
 
 
 # Clauses of a GENERAL line that describe *who* is speaking rather than how the

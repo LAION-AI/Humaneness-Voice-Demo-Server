@@ -32,6 +32,13 @@ import config
 # 0.14 and 0.48.  A burst asked for at 3 s is outside anything the model saw.
 BURST_DEFAULT = 0.28
 BURST_MIN, BURST_MAX = 0.14, 1.2
+# The director may mark a burst short or long instead of writing a number, which
+# would turn its bracket into something else entirely.  The values are the
+# corpus's own 10th and 90th percentiles, so "long" is half a second and not two:
+# the longest burst ever observed is 2.46 s and the median is 0.28.
+BURST_SHORT, BURST_LONG = 0.14, 0.48
+_LEN_WORD = re.compile(r"^\s*(short|brief|quick|tiny|long|drawn[- ]out|extended)\s+",
+                       re.I)
 PAUSE_DEFAULT = 0.30
 PAUSE_MIN = 0.20
 LEAD_PAUSE = 0.30
@@ -111,6 +118,16 @@ def burst_vocabulary(root=None):
     return vocab
 
 
+def burst_length(label):
+    """(cleaned label, seconds) for a label that may carry short/long."""
+    m = _LEN_WORD.match(str(label or ""))
+    if not m:
+        return str(label or "").strip(), BURST_DEFAULT
+    word = m.group(1).lower()
+    secs = BURST_SHORT if word in ("short", "brief", "quick", "tiny") else BURST_LONG
+    return _LEN_WORD.sub("", str(label), count=1).strip(), secs
+
+
 def _is_burst_label(txt):
     """Is this round bracket a vocal burst, or a direction about how to speak?
 
@@ -155,8 +172,11 @@ def parse(script):
         if any(a <= m.start() < b for a, b in taken):
             continue
         body = m.group(1).strip()
-        kind = ("burst", body, BURST_DEFAULT) if _is_burst_label(body) \
-            else ("direction", body)
+        if _is_burst_label(body):
+            lbl, secs = burst_length(body)
+            kind = ("burst", lbl, secs)
+        else:
+            kind = ("direction", body)
         marks.append((m.start(), m.end(), kind))
     marks.sort()
     for a, b, kind in marks:
