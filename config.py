@@ -800,7 +800,25 @@ ALIGN_QWEN_MAX_WORD_S = float(os.environ.get("MOSS_ALIGN_QWEN_MAX_WORD", "3.0"))
 # ---------------------------------------------------------------- wikiskills
 # The generated knowledge layer.  `coefficients.json` in here is what levers.py
 # reads; `VOCAL_BURSTS.md` is what the director reads, via skills.py.
-SKILLS_DIR = os.environ.get("MOSS_SKILLS_DIR", "/mnt/nvme/moss-15-v2-assets/wikiskills")
+def _skills_dir():
+    """Where the wiki lives: the assets copy, else the one in this repository.
+
+    `wikiskills/` is committed here, so a fresh clone has it without downloading
+    anything.  A deployment that keeps a newer copy alongside its other assets
+    wins, because that is the one the training side updates.
+    """
+    p = os.environ.get("MOSS_SKILLS_DIR")
+    if p:
+        return p
+    for cand in ("/mnt/nvme/moss-15-v2-assets/wikiskills",
+                 os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                              "wikiskills")):
+        if os.path.isdir(cand):
+            return cand
+    return "/mnt/nvme/moss-15-v2-assets/wikiskills"
+
+
+SKILLS_DIR = _skills_dir()
 SKILLS_ON = os.environ.get("MOSS_SKILLS", "1") not in ("0", "false", "")
 # Do not offer a burst class whose measured family hit rate is below this.  The
 # study's own shipping bar; under it a request is more likely to produce nothing

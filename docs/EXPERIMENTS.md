@@ -329,6 +329,16 @@ sft3_quality:genuineness_high 0.25 · blend_high 0.5 · esthetics_high 0.5
 sft3_emotion:Contentment 1.0
 ```
 
+> Two of those have since moved and this example is kept as it was measured: the
+> voice adapter is now **0.5**, because identity broke audibly once the burst and
+> delivery adapters grew — a failure speaker similarity over a whole take does
+> not catch. And burst weight is now **per class** from its own recipe, capped at
+> 1.5, rather than a flat 0.25. `DEFAULTS.md` is generated from the code and is
+> always current.
+
+```
+```
+
 This is a trade, not a free win. The stack that shipped before scored the
 highest genuineness of any condition measured (3.21 against 1.90); it bought
 that by loosening the control that keeps the model on script. The new defaults

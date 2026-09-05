@@ -16,7 +16,7 @@ three candidates, not per candidate.
 ## The reward
 
 ```
-R = ( norm(genuineness) + norm(blend) + 2 · norm(clap) ) · gate(WER)
+R = ( norm(genuineness) + norm(blend) + 2 · norm(clap) ) · (1 − WER)
 ```
 
 | term | what it is |
@@ -24,7 +24,7 @@ R = ( norm(genuineness) + norm(blend) + 2 · norm(clap) ) · gate(WER)
 | `genuineness` | `laion/voiceclap-commercial-genuineness`, 0–6 |
 | `blend` | `laion/voiceclap-commercial-vocalburst-blend`, 0–10 |
 | `clap` | cosine between the take's VoiceCLAP **audio** embedding and the **text** embedding of GENERAL plus every round bracket in the script |
-| `gate` | inverse word error rate, flattened to 1.0 above 0.85 |
+| `1 − WER` | the inverse word error rate, straight — no threshold |
 
 `clap` carries double weight because it is the only term that asks whether this
 is *the performance that was requested*. The other two ask whether it is a good

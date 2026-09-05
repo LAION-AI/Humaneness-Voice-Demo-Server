@@ -563,7 +563,9 @@ Everything the overlay can dial, with its default weight and slider maximum:
      "items": [{"name": "sft3_emotion:Amusement", "label": "Amusement",
                 "default": 0.0, "max": 2.0}, ...]},
     {"kind": "burst",         "title": "Vocal bursts",
-     "note": "Added automatically when the script contains one, at 0.25 (0.5 standing alone).",
+     "note": "Added automatically when the script contains one. With skills on,
+              at the weight measured for that class (0.25-2.3); a class with no
+              measured recipe falls back to 0.25 (0.5 standing alone).",
      "items": [{"name": "burst:chuckle", "label": "chuckle",
                 "default": 0.0, "max": 1.5}, ...]}
   ],

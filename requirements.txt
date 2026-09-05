@@ -22,4 +22,13 @@ speechbrain==1.1.0
 # because torch has already loaded them -- hence the load order in app.py.
 onnxruntime-gpu==1.22.0
 requests==2.34.2
+httpx                     # the director's HTTP client, hosted and local backends
 # ffmpeg must be on PATH (mp3 decode for the reference corpus)
+
+# NOT on PyPI, and not optional:
+#   genuineness_scorer, blend_model  ship inside the two scorer model repos.
+#                                    setup/fetch_scorers.py puts them where the
+#                                    code imports them from.
+# NOT on PyPI, and optional -- the server starts without them and says so:
+#   chatterbox_vc   voice conversion, only when the box is ticked
+#   sidon           speech restoration, only used by the reference-prep scripts

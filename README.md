@@ -403,6 +403,7 @@ export HF_HOME=/path/with/space          # the corpus shards are large
 python setup/fetch_profile_refs3.py      # best 3 takes per condition, ~3.5 GB kept
 python setup/build_retrieval_index.py    # condition centroids + emotion anchors
 python setup/profile_traits.py           # measured gender/age/timbre per voice
+python setup/fetch_scorers.py            # the two perceptual scorers
 ```
 
 `fetch_profile_refs3.py` streams one WebDataset shard at a time and deletes it

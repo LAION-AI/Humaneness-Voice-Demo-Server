@@ -162,9 +162,17 @@ forces any adapter at any weight, whatever the director decided.
    python setup/fetch_profile_refs3.py      # reference corpus, ~3.5 GB kept
    python setup/build_retrieval_index.py    # condition centroids + emotion anchors
    python setup/profile_traits.py           # measured gender/age/timbre per voice
+   python setup/fetch_scorers.py            # the two perceptual scorers
    ```
+   `fetch_scorers.py` is easy to skip and then hard to diagnose: `best_of_n`
+   imports `genuineness_scorer` and `blend_model`, which are Python files that
+   ship inside the two model repositories rather than on PyPI. Each also expects
+   a copy of the VoiceCLAP encoder beside it; the script links the one
+   `build_retrieval_index.py` already fetched instead of downloading it twice,
+   which is why it runs after that one.
    The adapters download from the Hub into the directories in
-   `config.LORA_ROOTS`. The two lever assets are release assets on this
+   `config.LORA_ROOTS`; `wikiskills/` is committed here, so the burst recipes
+   need no download at all. The two lever assets are release assets on this
    repository; without them the levers degrade to `adapter` and say so.
 4. **Check.** `python setup/check_levers.py` (48 checks, no GPU needed) and
    `python -m pytest tests` (burst vocabulary).
