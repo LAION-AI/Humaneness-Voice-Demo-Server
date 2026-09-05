@@ -287,6 +287,13 @@ class Skills:
         offer = {c for c, _ in self.offerable(available)}
         if not offer:
             return script, []
+        # A label the director already wrote as its own bracket needs no repair,
+        # and adding a second one puts the sound in twice.  Seen live: a
+        # direction mentioning a scream sat two words from the director's own
+        # `(scream)`, and both became bursts.
+        import re as _re0
+        already = {m.group(1).strip().lower().replace(" ", "_")
+                   for m in _re0.finditer(r"\(([^),0-9]+)\)", str(script or ""))}
         # longest first, so "fearful gasp" wins over "gasp"
         labels = sorted(offer, key=len, reverse=True)
         out, added, pos = [], [], 0
@@ -297,6 +304,8 @@ class Skills:
             low = body.lower()
             for lab in labels:
                 spaced = lab.replace("_", " ")
+                if lab in already or spaced.replace(" ", "_") in already:
+                    continue
                 if _re.search(rf"\b{_re.escape(spaced)}\b", low) and spaced != low.strip():
                     out.append((m.end(), spaced))
                     added.append(spaced)

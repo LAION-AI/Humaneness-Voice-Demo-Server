@@ -105,6 +105,40 @@ Verified end to end afterwards: the same request now produces
 `ablation_d2_matched__scream @1.5` together with `sharp_inhale @2.3` — two
 adapters, each at its own measured weight.
 
+## The recipe weights do not survive this stack
+
+Serving the measured per-class weights made the demo babble. Swept with the
+**script held fixed** — three burst-carrying scripts, two seeds, only the weight
+varying, because comparing across `/api/turn` calls measures the director writing
+a different line each time rather than the adapter:
+
+| w | 0.00 | 0.25 | 0.50 | 1.00 | 1.50 | **2.00** | **2.30** |
+|---|--:|--:|--:|--:|--:|--:|--:|
+| word error | 0.285 | 0.319 | 0.304 | 0.322 | 0.341 | **0.859** | **1.337** |
+| invented words | 0.67 | 0.67 | 0.67 | 0.67 | 0.67 | **1.83** | **3.17** |
+
+It is a **cliff, not a slope**: flat to 1.5, then intelligibility collapses. Nine
+recipes ask for 2.0 or 2.3 — `chuckle`, `sharp_inhale`, `soft_hum` among them —
+and every one is on the far side of it here. `BURST_LAM_MAX` is therefore 1.5,
+with a slider in the page to hear the recipe weights.
+
+This does not contradict the study. Its ladder measured **one** adapter, for
+several classes with no production stack under it at all, while a turn here
+merges it on top of a voice adapter, three quality adapters, a preference
+adapter, an emotion adapter and often a delivery axis. The study saw the same
+edge from its own side: nine of 400 ladder cells produced no decodable audio,
+every one at w ≥ 2.3.
+
+**Stacking is not the problem; weight is.** Two adapters cost nothing over one
+(1.0 ×2 → 0.285 against 0.319 for ×1; 1.5 ×2 → 0.320 against 0.322), so the
+total budget is generous and only bounds the merge cost.
+
+> An earlier version of this section put the ceiling at 1.0 and the budget at
+> 1.0, from turn-to-turn comparisons. Those were dominated by the director
+> writing a different script each call — the same configuration measured 0.000
+> once and 0.737 the next time — and both numbers were wrong. The fixed-script
+> sweep is the one to trust.
+
 ## Cue language
 
 Cues are written in **English even when the spoken line is German**. This is the

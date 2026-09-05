@@ -566,7 +566,27 @@ BURST_LAM_INTENSE = float(os.environ.get("MOSS_BURST_LAM_INTENSE", "0.5"))
 # have their own passing absolute WER (sharp_inhale at 2.3 measured 0.091), so
 # the two are not flatly contradictory; they are a different harness measuring a
 # different delta.  Set MOSS_BURST_LAM_MAX=1.5 to enforce the addendum's ceiling.
-BURST_LAM_MAX = float(os.environ.get("MOSS_BURST_LAM_MAX", "2.3"))
+# The recipe weights run to 2.3 and they do not survive this stack.  Swept with
+# the SCRIPT HELD FIXED -- three burst-carrying scripts, two seeds, only the
+# weight varying, because comparing across /api/turn calls measures the director
+# writing a different line each time and not the adapter:
+#
+#     w   0.00  0.25  0.50  1.00  1.50 | 2.00  2.30
+#     wer 0.285 0.319 0.304 0.322 0.341| 0.859 1.337
+#     inv 0.67  0.67  0.67  0.67  0.67 | 1.83  3.17
+#
+# It is a cliff, not a slope: flat to 1.5, then intelligibility collapses.  1.5
+# is the last safe rung, so the ceiling goes there.  Nine recipes ask for 2.0 or
+# 2.3 -- chuckle, sharp_inhale, soft_hum among them -- and every one of those is
+# on the far side of it here.
+#
+# Not a contradiction of the study: its ladder measured ONE adapter, for several
+# classes with no production stack under it, while a turn here merges it on top
+# of a voice adapter, three quality adapters, a preference adapter, an emotion
+# adapter and often a delivery axis.  The study saw the same edge from its own
+# side -- nine of 400 ladder cells produced no decodable audio, all at w >= 2.3.
+# Raise it with MOSS_BURST_LAM_MAX or the slider to hear the recipe weights.
+BURST_LAM_MAX = float(os.environ.get("MOSS_BURST_LAM_MAX", "1.5"))
 
 # ---------------------------------------------------------------- generation modes
 # THE THREE LEVERS.  Until now this server had exactly one way to shape a performance:
@@ -800,3 +820,17 @@ BURST_SET_ROOT = {"shipped": "burst", "v2": "burst_v2",
 # adapter and the choice fell to whichever name was the longer string.  Reading
 # the tags instead means a reply can want several; this bounds the merge cost.
 BURST_MAX_ADAPTERS = int(os.environ.get("MOSS_BURST_MAX_ADAPTERS", "3"))
+# The recipe weights were each measured with ONE adapter merged, and for several
+# classes with no production stack under it at all ("nur der Adapter").  Serving
+# three of them at once summed to 4.8 on top of eight other adapters and produced
+# babble -- far outside anything that was measured.  So the total is budgeted:
+# bursts are kept in script order until the budget is spent, which leaves every
+# adapter that IS merged at exactly its measured weight rather than rescaling it
+# to a value nobody tested.
+# The total across a turn is budgeted too, but generously: measured on the same
+# fixed scripts, two adapters cost nothing over one (1.0 x2 -> 0.285 against
+# 0.319 for x1; 1.5 x2 -> 0.320 against 0.322).  It is the weight of a single
+# adapter that breaks a line, not the sum, so this only bounds the merge cost.
+# An earlier budget of 1.0 here was set from turn-to-turn comparisons that were
+# dominated by the director writing different scripts, and was wrong.
+BURST_LAM_BUDGET = float(os.environ.get("MOSS_BURST_LAM_BUDGET", "3.0"))

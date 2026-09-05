@@ -242,6 +242,10 @@
       <input type="checkbox" id="pure"> Pure <i>(Basis + Referenz)</i></label>
     <label title="Die Regieanweisungen waehlen per Retrieval einen Emotions-Adapter, gemergt mit dem publizierten Wert 1.5. Aus: nur SFT3-Basis + abgerufener Referenzclip.">
       <input type="checkbox" id="emonuance" checked> Emotions-Nuancen <i>(Adapter @1.5)</i></label>
+    <label title="Obergrenze fuer das Merge-Gewicht eines Burst-Adapters. Die Rezepte nennen bis 2.3, gemessen mit EINEM Adapter ohne Produktionsstapel; in diesem Stapel ist es eine Klippe: bis 1.5 kostenlos (WER 0.34), bei 2.0 bricht es ein (0.86) und bei 2.3 zerfaellt die Zeile (1.34).">
+      Burst-Gewicht max
+      <input id="blmax" type="range" min="0.25" max="2.3" step="0.05" value="1.5">
+      <b id="blmaxv">1.50</b></label>
     <label title="Welcher Adaptersatz die Bursts liefert. Vorgabe folgt pro Klasse dem, was ihr eigenes Rezept als besten Adapter misst; die festen Saetze dienen dem Vergleich.">
       Burst-Adapter
       <select id="burstset" style="background:var(--panel2);border:1px solid var(--line);
@@ -546,6 +550,7 @@ async function send(){
                             align: $('align').checked,
                             skills: $('skills').checked,
                             burst_set: $('burstset').value,
+                            burst_lam_max: parseFloat($('blmax').value),
                             qdpo_lams: {
                               'sft3_qdpo:quality_dpo':
                                   $('qdpo').checked ? parseFloat($('qdpos').value) : 0,
@@ -667,7 +672,7 @@ $('send').onclick = send;
 $('vol').addEventListener('input', e=>{ if(gain) gain.gain.value = parseFloat(e.target.value); });
 const dial = (id,out)=>{ const f=()=> $(out).textContent = parseFloat($(id).value).toFixed(2);
                          $(id).addEventListener('input', f); f(); };
-dial('spk','spkv'); dial('aes','aesv'); dial('stopb','stopbv'); dial('plam','plamv'); dial('cfgs','cfgsv'); dial('qdpos','qdposv'); dial('bsdpos','bsdposv');
+dial('spk','spkv'); dial('aes','aesv'); dial('stopb','stopbv'); dial('plam','plamv'); dial('cfgs','cfgsv'); dial('qdpos','qdposv'); dial('bsdpos','bsdposv'); dial('blmax','blmaxv');
 $('sweepbtn').onclick = runSweep;
 // the ten speaker profiles, each with its own anchor recording and adapter
 fetch('/api/state').then(r=>r.json()).then(s=>{

@@ -961,7 +961,12 @@ async def turn(req: Request):
                         else:
                             cand = f"{config.BURST_SET_ROOT.get(_sel, 'burst')}:{cls}"
                         return cand if cand in lb.repos else n
-                    _cap = config.BURST_LAM_MAX
+                    try:
+                        _cap = float(body.get("burst_lam_max")
+                                     if body.get("burst_lam_max") is not None
+                                     else config.BURST_LAM_MAX)
+                    except (TypeError, ValueError):
+                        _cap = config.BURST_LAM_MAX
 
                     def _burst_lam(name, flat):
                         # `weight_for` returns the flat default unchanged when the
@@ -982,16 +987,23 @@ async def turn(req: Request):
                                 tagged.append(lab)
                     tagged = tagged[:config.BURST_MAX_ADAPTERS]
                     specs = [(n, l) for n, l in specs if not n.startswith("burst")]
+                    _spent = 0.0
                     for lab in tagged:
                         cand = _reroot(f"burst:{lab}")
+                        _w = _burst_lam(f"burst:{lab}", config.BURST_LAM)
+                        if _spent + _w > config.BURST_LAM_BUDGET and _spent > 0:
+                            print(f"[skills] burst budget spent, {lab} not merged "
+                                  f"({_spent:g} + {_w:g} > "
+                                  f"{config.BURST_LAM_BUDGET:g})", flush=True)
+                            continue
                         if cand in lb.repos:
+                            _spent += _w
                             # weight by the CLASS, not the adapter name: the
                             # ablation arms are filed as
                             # `ablation_d2_matched__scream`, whose tail is not
                             # the class, so weighting by the name silently fell
                             # back to the flat default.
-                            specs.append(
-                                (cand, _burst_lam(f"burst:{lab}", config.BURST_LAM)))
+                            specs.append((cand, _w))
 
                     specs = [((n, _burst_lam(n, l)) if _isb(n)
                               else (n, l)) for n, l in specs]

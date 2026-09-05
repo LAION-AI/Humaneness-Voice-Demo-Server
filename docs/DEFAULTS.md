@@ -113,8 +113,9 @@ environment variable too, so nothing here needs a code edit to change.
 | `ASR_DEVICE` | `cuda:1` |
 | `ASSETS` | `/mnt/nvme/moss-15-v2-assets/loras` |
 | `BURST_LAM` | `0.25` |
+| `BURST_LAM_BUDGET` | `3.0` |
 | `BURST_LAM_INTENSE` | `0.5` |
-| `BURST_LAM_MAX` | `2.3` |
+| `BURST_LAM_MAX` | `1.5` |
 | `BURST_MAX_ADAPTERS` | `3` |
 | `BURST_SET` | `recipe` |
 | `BURST_SET_ROOT` | `{'shipped': 'burst', 'v2': 'burst_v2', 'v2_top1': 'burst_v2_top1', 'group': 'burst_grp'}` |
@@ -127,7 +128,7 @@ environment variable too, so nothing here needs a code edit to change.
 | `CONTINUITY` | `the same speaker continues without interruption: identical voice, identical person, same microphone and same room.` |
 | `DELIVERY_LEVER` | `adapter` |
 | `EIV_DIR` | `/mnt/nvme/empathic-insights-voice-small` |
-| `EMOTION_NAMES` | `{'Teasing', 'Hope_Enthusiasm_Optimism', 'Affection', 'Sourness', 'Pride', 'Impatience_and_Irritability', 'Intoxication_Altered_States_of_Consciousness', 'Embarrassment', 'Doubt', 'Emotional_Numbness', …` |
+| `EMOTION_NAMES` | `{'Helplessness', 'Interest', 'Thankfulness_Gratitude', 'Pride', 'Affection', 'Astonishment_Surprise', 'Distress', 'Doubt', 'Jealousy_and_Envy', 'Pleasure_Ecstasy', 'Elation', 'Infatuation', 'Intoxicat …` |
 | `GEN_MODE` | `adapter` |
 | `HISTORY_TURNS_LOCAL` | `8` |
 | `HISTORY_TURNS_LUNA` | `40` |
