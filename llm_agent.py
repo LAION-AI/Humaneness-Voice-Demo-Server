@@ -21,7 +21,7 @@ levers pushes it -- adapter, steering vector, guidance -- and how hard.  The
 server resolves it against the measured coefficient table and may refuse; see
 levers.py and docs/LEVERS.md.
 """
-import json, re, time
+import asyncio, json, re, time
 
 import httpx
 
