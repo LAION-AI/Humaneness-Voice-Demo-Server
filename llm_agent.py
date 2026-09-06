@@ -758,13 +758,58 @@ def _loads_loose(raw):
     if s.startswith("```"):
         s = re.sub(r"^```[a-zA-Z]*\s*", "", s)
         s = re.sub(r"\s*```$", "", s).strip()
+    # Some models put their whole chain of thought in `content` instead of in
+    # `reasoning_content` -- glm-5.3 did it on roughly one turn in six, 14,000
+    # characters of "The user asks:..." with the answer somewhere after it.
+    # First-brace-to-last-brace fails there as soon as the prose contains a
+    # brace of its own, so scan for a BALANCED object that looks like a turn.
     try:
-        return json.loads(s)
+        got = json.loads(s)
+        if isinstance(got, dict):
+            return got
     except Exception:
-        i, k = s.find("{"), s.rfind("}")
-        if i >= 0 and k > i:
-            return json.loads(s[i:k + 1])
-        raise
+        pass
+    for cand in _balanced_objects(s):
+        try:
+            o = json.loads(cand)
+        except Exception:
+            continue
+        if isinstance(o, dict) and ({"script", "s", "voice", "reply"} & set(o)):
+            return o
+    i, k = s.find("{"), s.rfind("}")
+    if i >= 0 and k > i:
+        return json.loads(s[i:k + 1])
+    raise ValueError("no JSON object in the reply")
+
+
+def _balanced_objects(s):
+    """Every balanced {...} span in `s`, longest first.
+
+    String-aware, so a brace inside a quoted value does not end the object.
+    """
+    spans = []
+    for i, ch in enumerate(s):
+        if ch != "{":
+            continue
+        depth, instr, esc = 0, False, False
+        for j in range(i, len(s)):
+            x = s[j]
+            if esc:
+                esc = False
+                continue
+            if x == "\\" and instr:
+                esc = True
+            elif x == '"':
+                instr = not instr
+            elif not instr:
+                if x == "{":
+                    depth += 1
+                elif x == "}":
+                    depth -= 1
+                    if depth == 0:
+                        spans.append(s[i:j + 1])
+                        break
+    return sorted(spans, key=len, reverse=True)
 
 
 def _harden(node):
@@ -1091,11 +1136,33 @@ class LLMAgent:
                 f"{self.backend}: no completion returned "
                 f"({json.dumps(j)[:200]})")
         raw = j["choices"][0]["message"].get("content") or ""
+        out = None
         try:
             out = _loads_loose(raw)
         except Exception:
-            out = {"reply": raw.strip(), "general": "", "script": "",
-                   "voice": {"mode": "none"}}
+            out = None
+        if not isinstance(out, dict) or not (out.get("script") or out.get("s")):
+            # Falling back to `{"reply": raw}` here put the model's own thinking
+            # in the place the performance belongs, which is how this surfaced:
+            # a reply that began "The user asks:...".  Ask once more instead.
+            print(f"[llm] {self.model} returned no usable script "
+                  f"({len(raw)} chars); asking once more", flush=True)
+            r2 = await self.client.post(f"{self.base}/v1/chat/completions",
+                                        json=body, headers=headers)
+            if r2.status_code < 400 and (r2.json().get("choices") or []):
+                raw2 = r2.json()["choices"][0]["message"].get("content") or ""
+                try:
+                    o2 = _loads_loose(raw2)
+                    if isinstance(o2, dict) and (o2.get("script") or o2.get("s")):
+                        out, raw = o2, raw2
+                except Exception:
+                    pass
+            ms = (time.time() - t0) * 1000
+        if not isinstance(out, dict) or not (out.get("script") or out.get("s")):
+            raise RuntimeError(
+                f"{self.backend}: the director returned no script. This is "
+                f"usually a model putting its reasoning in `content` — try "
+                f"another brain, or the same one again.")
         if self.style == "codes" and self.codebook is not None:
             out = self._from_codes(out)
         out = self._clean(out, identity=identity)

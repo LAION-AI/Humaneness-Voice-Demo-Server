@@ -74,7 +74,7 @@ the web UI ships with.
 |---|---|---|
 | `profile` | `emolia_c1699` | which voice. `GET /api/state` lists them |
 | `persona` | none | a character brief prepended to the director's prompt. `GET /api/personas` lists them |
-| `brain` | `local` | `local` (gemma-4-12B on this box), or `luna` / `glm` / `gemini-flash` / `gemini-flash-lite` with a key. `glm` is `glm-5.3`, a 1M-context model that takes `max_tokens` rather than `max_completion_tokens` and returns an occasional retryable 400 — the server retries once |
+| `brain` | `local` | `local` (gemma-4-12B on this box), or `luna` / `glm` / `gemini-flash` / `gemini-flash-lite` with a key. `glm` is `glm-5.3`, a 1M-context model with three quirks the server handles: it takes `max_tokens` rather than `max_completion_tokens`, it returns an occasional retryable 400, and on roughly one turn in six it puts its whole chain of thought in `content` instead of `reasoning_content` |
 | `prompt_style` | `prose` | `prose` or the compact `codes` style (see [`CONTEXT.md`](CONTEXT.md)) |
 | `language` | the director decides | force with `"English"` / `"German"` |
 | `history` | `[]` | `[{"role":"user","content":"…"}, …]` for a continuing conversation |
