@@ -192,3 +192,16 @@ environment variable too, so nothing here needs a code edit to change.
 | `WHISPER_DIR` | `/mnt/nvme/moss-15-v2-assets/bude-whisper` |
 | `WIKI_COEFFICIENTS` | `/mnt/nvme/moss-15-v2-assets/wikiskills/coefficients.json` |
 | `_OLD_BASE_STYLE_LORAS` | `(('voicenet:vn_S_CONV__high', 0.25), ('voicenet:vn_S_CASU__high', 0.5), ('voicenet:vn_WARM__high', 0.25))` |
+
+## SIDON restoration
+
+| setting | default | what it does |
+|---|---|---|
+| `SIDON_ON` (`MOSS_SIDON`) | `1` | restore every take before it is judged and heard |
+| `SIDON_BASE` (`MOSS_SIDON_BASE`) | `http://127.0.0.1:8793` | the restoration service |
+| `SIDON_DEVICE` (`MOSS_SIDON_DEVICE`) | `cuda:0` | inside the service's own process |
+| `SIDON_TIMEOUT` | `120` | seconds before a batch is given up on |
+
+On means no streaming: the take is generated whole, restored, then sent. Start
+the service with `./run.sh sidon`; without it the server keeps working and
+returns the takes unrestored. See `docs/SIDON.md`.

@@ -181,3 +181,29 @@ forces any adapter at any weight, whatever the director decided.
 Every setting is an environment variable as well as a config entry, so nothing
 above needs a code edit to change. `MOSS_` prefixes throughout —
 [`DEFAULTS.md`](DEFAULTS.md) lists all of them with their current values.
+
+---
+
+## Restoration
+
+Every endpoint that returns finished audio takes a `sidon` boolean, defaulting
+to `SIDON_ON` (**on**):
+
+| endpoint | effect |
+|---|---|
+| `POST /api/turn` | the reply is generated offline instead of streamed, restored, and returned; every candidate carries `pcm` (restored) and `pcm_raw` (as generated) |
+| `POST /api/cfg_sweep` | each guidance value is restored; the take carries `pcm` and `pcm_raw` |
+
+```bash
+curl -s localhost:8792/api/turn -H 'content-type: application/json' -d '{
+  "message": "Tell me something that made you laugh this week.",
+  "best_of": 3, "sidon": true }' --output turn.bin
+```
+
+With `best_of > 1` the candidates are restored **before** they are scored, so
+the reward ranks the audio that will actually be heard. `sidon: false` restores
+streaming.
+
+The service is separate: `./run.sh sidon` (port 8793). If it is not running the
+server still works and returns unrestored takes; `GET /api/state` reports
+`sidon: {on, ok, clips, ms_per_clip}`.

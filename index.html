@@ -268,6 +268,8 @@
       <input type="checkbox" id="skills" checked> Neue Skills <i>(gemessene Bursts)</i></label>
     <label title="Forced Alignment gegen das Skript: einblenden bis zum ersten Wort, nach dem letzten Wort ausblenden und abschneiden. Beginnt das Skript mit einem Vocal Burst, bleibt der Anfang unberuehrt.">
       <input type="checkbox" id="align" checked> Ende beschneiden <i>(Alignment)</i></label>
+    <label class="hint" title="SIDON restauriert die Aufnahme, bevor sie bewertet und ausgegeben wird. Gemessen: +0.43 von 5 auf Klang, kein Effekt auf Natuerlichkeit. Kostet Streaming — die Antwort wird komplett erzeugt und dann restauriert.">
+      <input type="checkbox" id="sidon" checked> SIDON-Restauration <i>(kein Streaming)</i></label>
     <label title="Preference-Adapter step376. Die Praeferenzaufgabe ist dort geloest; spaetere Schritte vergroessern nur die Marge. Von niemandem gehoert.">
       <input type="checkbox" id="qdpo" checked> Quality-DPO
       <input id="qdpos" type="range" min="0" max="2" step="0.05" value="1.5"
@@ -349,6 +351,15 @@ function wavBlob(chunks, sr){
   for(const c of chunks){ for(let i=0;i<c.length;i++){ v.setInt16(o, c[i], true); o+=2; } }
   return new Blob([buf], {type:'audio/wav'});
 }
+// base64 -> Int16Array.  wavBlob writes with setInt16, so this must stay Int16:
+// converting to float -1..1 first truncates every sample to zero and produces
+// silence of exactly the right length.
+function b64pcm(b64){
+  const raw = atob(b64);
+  const buf = new Uint8Array(raw.length);
+  for(let i=0;i<raw.length;i++) buf[i]=raw.charCodeAt(i);
+  return new Int16Array(buf.buffer);
+}
 function attachPlayer(node, chunks, sr, secs, label){
   if(!node || !chunks.length) return null;
   const url = URL.createObjectURL(wavBlob(chunks, sr));
@@ -402,7 +413,8 @@ async function runSweep(){
       headers:{'content-type':'application/json'},
       body: JSON.stringify({general:t.general, general_unc:t.general_unc,
                             script:t.script, language:t.language,
-                            profile:t.profile, loras:t.loras, guidance:vals})});
+                            profile:t.profile, loras:t.loras, guidance:vals,
+                            sidon: $('sidon').checked})});
     if(!res.ok){ addMsg('bot','⚠ Sweep '+res.status+': '+(await res.text()).slice(0,200)); return; }
     const j = await res.json();
     node.querySelector('.bubble').textContent =
@@ -419,7 +431,11 @@ async function runSweep(){
       // this must stay Int16.  Converting to float -1..1 first made every
       // sample truncate to zero and produced silence of exactly the right length.
       attachPlayer(node, [new Int16Array(buf.buffer)], j.sr||48000,
-                   take.sec, 'g = '+take.guidance);
+                   take.sec, 'g = '+take.guidance + (take.sidon ? ' · restauriert' : ''));
+      if(take.pcm_raw){
+        attachPlayer(node, [b64pcm(take.pcm_raw)], j.sr||48000, take.sec,
+                     'g = '+take.guidance+' · Original');
+      }
     }
     const d=document.createElement('details'); d.className='cues';
     d.innerHTML = '<summary>neutralisierter Zweig</summary><pre>'+
@@ -556,6 +572,7 @@ async function send(){
                             stop_bias: parseFloat($('stopb').value),
                             gen_mode: $('cfg').checked ? 'adapter+cfg' : 'adapter',
                             align: $('align').checked,
+                            sidon: $('sidon').checked,
                             skills: $('skills').checked,
                             burst_set: $('burstset').value,
                             burst_lam_max: parseFloat($('blmax').value),
@@ -636,7 +653,12 @@ async function send(){
             const d = document.createElement('details'); d.className='cues';
             d.open = true;
             const h = document.createElement('summary');
-            h.textContent = 'Best-of-' + ev.n + ' · g=' + ev.guidance +
+            // With N = 1 this block exists only because SIDON needs the whole
+            // take, so calling it "Best-of-1" would be a lie about why the
+            // reply did not stream.
+            h.textContent = (ev.n > 1 ? 'Best-of-' + ev.n + ' · g=' + ev.guidance
+                                      : 'Offline erzeugt') +
+                            (ev.sidon ? ' · SIDON' : '') +
                             ' · ' + (ev.ms/1000).toFixed(1) + ' s';
             d.appendChild(h);
             for(const c of cs){
@@ -656,12 +678,16 @@ async function send(){
                 '<span>clap ' + c.clap.toFixed(3) + '</span>';
               row.appendChild(tag);
               d.appendChild(row);
+              const pcm16 = b64pcm;
               if(c.pcm){
-                const raw = atob(c.pcm);
-                const buf = new Uint8Array(raw.length);
-                for(let i=0;i<raw.length;i++) buf[i]=raw.charCodeAt(i);
-                attachPlayer(row, [new Int16Array(buf.buffer)], ev.sr||48000,
-                             c.sec, null);
+                attachPlayer(row, [pcm16(c.pcm)], ev.sr||48000, c.sec,
+                             ev.sidon ? 'restauriert' : null);
+              }
+              // The take as generated, so the restoration can be judged by ear
+              // instead of taken on trust.  It never plays by itself.
+              if(c.pcm_raw){
+                attachPlayer(row, [pcm16(c.pcm_raw)], ev.sr||48000, c.sec,
+                             'Original');
               }
             }
             if(node) node.appendChild(d);

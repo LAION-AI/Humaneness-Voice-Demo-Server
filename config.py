@@ -900,3 +900,21 @@ BON_BATCH_CFG = int(os.environ.get("MOSS_BON_BATCH_CFG", "4"))
 # chose itself is never touched.
 BREATHE_ON = os.environ.get("MOSS_BREATHE", "1") not in ("0", "false", "no")
 BREATHE_MAX = int(os.environ.get("MOSS_BREATHE_MAX", "2"))
+
+# ----------------------------------------------------------------- sidon ----
+# Speech restoration as the last step before a clip is heard.  Measured +0.43 of
+# 5 on "how pleasant does this sound" (p < 0.001, 21 paired clips) with no
+# movement on how natural or how fitting the performance is: it cleans the
+# signal, not the delivery.  See docs/SIDON.md.
+# This is the TorchScript pair served from the hub snapshot, which is a
+# different path from SIDON_SRC above — that one is the research checkout used
+# once, offline, to restore the corpus anchor.
+# The app sees the TTS card as cuda:0 and the language model's as cuda:1;
+# restoration goes on the second so it never competes with generation.
+SIDON_ON = os.environ.get("MOSS_SIDON", "1") not in ("0", "false", "no")
+SIDON_DEVICE = os.environ.get("MOSS_SIDON_DEVICE", "cuda:0")
+SIDON_SNAPSHOT = os.environ.get(
+    "MOSS_SIDON_SNAPSHOT",
+    "/mnt/nvme/hf_cache/hub/models--sarulab-speech--sidon-v0.1/snapshots/*")
+SIDON_BASE = os.environ.get("MOSS_SIDON_BASE", "http://127.0.0.1:8793")
+SIDON_TIMEOUT = float(os.environ.get("MOSS_SIDON_TIMEOUT", "120"))

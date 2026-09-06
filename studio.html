@@ -467,9 +467,24 @@ async function send(){
                 .replace(/\[([^\]]*)\]/g, '<i class="pause">[$1]</i>');
               window._lastDet.innerHTML=`<summary>Prompt &mdash; exactly as sent</summary><pre>${pm}</pre>`;
             }
+          } else if(ev.type==='best_of'){
+            // With SIDON on, the reply is generated offline and restored, so
+            // the take as generated never reaches the stream.  Keep it here,
+            // unplayed, so the restoration can be checked by ear.
+            const c=(ev.candidates||[]).find(x=>x.pcm_raw);
+            if(c && node) window._sidonRaw={pcm:c.pcm_raw, sec:c.sec, sr:ev.sr||48000};
           } else if(ev.type==='end'){
             if(node) node.classList.remove('speaking');
             attachPlayer(node, chunks, sr, ev.audio_sec||0);
+            if(window._sidonRaw && node){
+              const r=window._sidonRaw, b=atob(r.pcm), u=new Uint8Array(b.length);
+              for(let i=0;i<b.length;i++) u[i]=b.charCodeAt(i);
+              attachPlayer(node, [new Int16Array(u.buffer)], r.sr, r.sec);
+              const t=node.querySelectorAll('.player');
+              if(t.length>1) t[t.length-1].insertAdjacentHTML('afterbegin',
+                '<b style="color:var(--accent2);margin-right:6px">Original</b>');
+              window._sidonRaw=null;
+            }
             $('s_dur').textContent=(ev.audio_sec||0).toFixed(2)+' s';
             $('s_rtf').textContent=(ev.rtf!=null?ev.rtf.toFixed(2)+'×':'—');
             const sim=ev.speaker_sim;

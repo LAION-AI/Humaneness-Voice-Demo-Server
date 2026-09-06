@@ -22,6 +22,7 @@ import lora_bank
 import align_engine
 import bestofn
 import steer_engine
+import sidon
 import timed_script
 from llm_agent import VOICE_TOOL, LLMAgent
 from lora_bank import LoraBank
@@ -288,6 +289,7 @@ async def state():
         "brains": ["local"] + list(config.HOSTED_MODELS),
         "profiles": voice_profiles.listing(STATE["profiles"]),
         "default_profile": config.DEFAULT_PROFILE,
+        "sidon": {"on": config.SIDON_ON, **(sidon.health() or {"ok": False})},
         "personas": personas.listing(), "speaker_lora": config.SPEAKER_LORA in (
             STATE["lora"].repos if STATE["lora"] else {}),
         "llm": await agent.health() if agent else False,
@@ -541,12 +543,23 @@ async def cfg_sweep(req: Request):
         if b.get("align", config.ALIGN_ON) is not False \
                 and STATE.get("aligner") is not None:
             w, arep = align_engine.trim(w, tts.sr, tagged, plain, STATE["aligner"])
+        raw = w
+        used = False
+        if b.get("sidon", config.SIDON_ON) is not False:
+            w, used = await asyncio.get_running_loop().run_in_executor(
+                None, lambda _w=w: sidon.enhance(_w, tts.sr))
         pcm = np.clip(w * 32767, -32768, 32767).astype("<i2").tobytes()
-        out.append({"guidance": g, "align": arep,
-                    "pcm": base64.b64encode(pcm).decode(),
-                    "sec": round(len(w) / tts.sr, 3),
-                    "ms": round((time.time() - t0) * 1000, 1),
-                    "rtf": meta.get("rtf")})
+        row = {"guidance": g, "align": arep, "sidon": used,
+               "pcm": base64.b64encode(pcm).decode(),
+               "sec": round(len(w) / tts.sr, 3),
+               "ms": round((time.time() - t0) * 1000, 1),
+               "rtf": meta.get("rtf")}
+        if used:
+            # the take as generated, so the restoration can be judged by ear
+            # rather than taken on trust
+            r16 = np.clip(raw * 32767, -32768, 32767).astype("<i2").tobytes()
+            row["pcm_raw"] = base64.b64encode(r16).decode()
+        out.append(row)
     return {"sr": tts.sr, "takes": out, "tokens": frames,
             "script": tagged, "script_unc": unc_tagged,
             "instruction": instruction, "instruction_unc": instruction_unc}
@@ -654,7 +667,8 @@ async def turn(req: Request):
         try:
             out, llm_ms, _ = await agent.turn(
                 message, history, persona=persona, heard=heard,
-                identity=(prof or {}).get("identity"))
+                identity=(prof or {}).get("identity"),
+                extra=body.get("prompt_extra"))
         except Exception as e:
             yield _ev({"type": "error", "where": "llm", "message": str(e)})
             return
@@ -1177,7 +1191,15 @@ async def turn(req: Request):
             bon_n = 1
         bon = None
         bon_error = None
-        if bon_n > 1 and STATE.get("judge") is not None and config.TIMED_SCRIPT:
+        # Restoration needs the whole take, so a turn that will be restored
+        # cannot be streamed: it is generated offline, restored, and then sent
+        # down the same chunked protocol.  That makes an ordinary chat turn take
+        # the best-of-N path with N = 1.
+        want_sidon = body.get("sidon", config.SIDON_ON) is not False
+        if want_sidon and not sidon.up():
+            want_sidon = False
+        if (bon_n > 1 or want_sidon) and STATE.get("judge") is not None \
+                and config.TIMED_SCRIPT:
             try:
                 _tg, _fr, _pl = timed_script.render(out["script"], speed=speed)
                 lc = "DE" if str(spoken).lower().startswith(("ger", "de")) else "EN"
@@ -1188,7 +1210,11 @@ async def turn(req: Request):
                         "instruction": f"GENERAL: {_gl}\nSCRIPT:\n{_tg}",
                         "ref_codes": ref_codes}
                 gv = body.get("best_of_guidance")
-                gv = (config.BON_GUIDANCE if gv is None else float(gv))
+                # Guidance is a best-of-N setting, not a restoration one: a
+                # plain turn that is only here to be restored must not silently
+                # acquire a 1.93x cost it never asked for.
+                gv = ((config.BON_GUIDANCE if bon_n > 1 else 1.0)
+                      if gv is None else float(gv))
                 if gv > 1.0001 and out.get("general_unc"):
                     _gu = timed_script.general_line(
                         out["general_unc"], _fr / config.FRAME_RATE, lc, None)
@@ -1234,6 +1260,14 @@ async def turn(req: Request):
                     raise RuntimeError("not enough memory for a single candidate")
 
                 waves = await loop.run_in_executor(None, _gen_chunked)
+                # Restore BEFORE ranking, so the reward is computed on the audio
+                # that will actually be heard rather than on a version of it
+                # nobody gets.  The originals travel alongside for comparison.
+                raw_waves = list(waves)
+                sidon_used = False
+                if want_sidon:
+                    waves, sidon_used = await loop.run_in_executor(
+                        None, lambda: sidon.enhance_many(raw_waves, tts.sr))
                 cands = STATE["judge"].score(waves, tts.sr, _pl,
                                              general=out["general"],
                                              script=out["script"])
@@ -1241,7 +1275,7 @@ async def turn(req: Request):
                 best = min(range(len(cands)), key=lambda i: cands[i]["rank"])
                 bon = {"n": len(cands), "guidance": gv,
                        "ms": round((time.time() - t_bon) * 1000, 1),
-                       "chosen": best,
+                       "chosen": best, "sidon": sidon_used,
                        "candidates": [{k: c[k] for k in
                                        ("reward", "rank", "gate", "wer", "extra_w",
                                         "genuineness", "blend", "clap", "sec")}
@@ -1267,6 +1301,13 @@ async def turn(req: Request):
                                         -32768, 32767).astype("<i2").tobytes()
                         bon["candidates"][i]["pcm"] = _b64.b64encode(pcm16).decode()
                         bon["candidates"][i]["index"] = i
+                        if sidon_used and i < len(raw_waves) \
+                                and raw_waves[i] is not None:
+                            r16 = np.clip(np.asarray(raw_waves[i], np.float32)
+                                          * 32767, -32768,
+                                          32767).astype("<i2").tobytes()
+                            bon["candidates"][i]["pcm_raw"] = \
+                                _b64.b64encode(r16).decode()
             except Exception as e:
                 import traceback
                 print(f"[bestofn] failed, falling back to streaming: "

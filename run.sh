@@ -3,8 +3,9 @@
 #
 #   ./run.sh llm     language model only   (GPU $MOSS_LLM_GPU, port 8790)
 #   ./run.sh app     voice model + web UI  (GPU $MOSS_TTS_GPU, port 8792)
-#   ./run.sh both    both, backgrounded, logs in ./logs
-#   ./run.sh stop    stop both
+#   ./run.sh sidon   speech restoration    (GPU $MOSS_LLM_GPU, port 8793)
+#   ./run.sh both    all three, backgrounded, logs in ./logs
+#   ./run.sh stop    stop all three
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -18,6 +19,7 @@ export MOSS_LLM_GPU="${MOSS_LLM_GPU:-0}"
 export MOSS_TTS_GPU="${MOSS_TTS_GPU:-1}"
 export MOSS_APP_PORT="${MOSS_APP_PORT:-8792}"
 LLM_PORT=8790
+SIDON_PORT="${MOSS_SIDON_PORT:-8793}"
 mkdir -p logs
 
 start_llm() {
@@ -39,12 +41,27 @@ start_app() {
     "$VENV/bin/python" -m uvicorn app:app --host 0.0.0.0 --port "$MOSS_APP_PORT"
 }
 
+start_sidon() {
+  # SIDON's TorchScript constants are pinned to cuda:0 at trace time, so the
+  # only way to keep it off the TTS card is to give it a process whose cuda:0
+  # is a different card.  It costs 1.67 GiB, which the TTS card does not have
+  # to spare during a guided best-of-N batch.
+  echo "[sidon] speech restoration on GPU $MOSS_LLM_GPU, port $SIDON_PORT"
+  env -u LD_LIBRARY_PATH CUDA_VISIBLE_DEVICES="$MOSS_LLM_GPU" \
+    HF_HOME="${HF_HOME:-$HOME/.cache/huggingface}" \
+    "$VENV/bin/python" -m uvicorn sidon_server:app \
+      --host 127.0.0.1 --port "$SIDON_PORT"
+}
+
 case "${1:-both}" in
   llm) start_llm ;;
   app) start_app ;;
+  sidon) start_sidon ;;
   both)
     start_llm >logs/llm.log 2>&1 &
     echo "  llm pid $!  -> logs/llm.log"
+    start_sidon >logs/sidon.log 2>&1 &
+    echo "  sidon pid $!  -> logs/sidon.log"
     start_app >logs/app.log 2>&1 &
     echo "  app pid $!  -> logs/app.log"
     echo "open http://localhost:$MOSS_APP_PORT"
@@ -52,6 +69,7 @@ case "${1:-both}" in
   stop)
     pkill -f "llama-server.*gemma-4-12b" || true
     pkill -f "uvicorn app:app" || true
+    pkill -f "uvicorn sidon_server:app" || true
     echo "stopped" ;;
-  *) echo "usage: $0 {llm|app|both|stop}"; exit 1 ;;
+  *) echo "usage: $0 {llm|app|sidon|both|stop}"; exit 1 ;;
 esac
