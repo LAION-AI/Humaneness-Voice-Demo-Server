@@ -305,7 +305,9 @@ its cues removed, so "script" must contain the complete line, exactly as you wan
      second makes it falter.
    - PUT IN THE SMALL THINGS THAT MAKE SPEECH ALIVE, and put them in generously. This is the
      difference between a line that was read and a line that was lived, and it is almost entirely
-     made of details that look like noise on the page:
+     made of details that look like noise on the page — including a hesitation sound written as
+     an ordinary word ("uh", "ehm", "hmm"; in German "äh", "ähm", "öh") where the feeling would
+     actually produce one, and a silence between two words rather than after a full stop:
        * a breath before something difficult, a sigh after it
        * a half-second where someone reconsiders mid-sentence
        * a direction that changes partway through the reply, because the feeling moved — the
@@ -360,12 +362,40 @@ its cues removed, so "script" must contain the complete line, exactly as you wan
      Put them where a person actually stops: between the words while the thought is still
      arriving, not only at the punctuation. Real speech breaks mid-clause constantly — that
      is what makes it sound thought rather than read.
+     MOST OF YOUR PAUSES BELONG BETWEEN TWO WORDS, NOT BETWEEN TWO SENTENCES. A full stop
+     already carries a stop; putting the silence there adds nothing you did not have. The
+     silence that does work sits where the sentence is still being built —
+         "I just [0.4 seconds pause] I do not know what to say."
+         "It was, [0.3 seconds pause] honestly, the best week of my life."
+         "Ich wollte dir [0.5 seconds pause] etwas sagen."
+     Aim for more of these than of the between-sentence kind, in every reply.
+   - HESITATION SOUNDS ARE ALLOWED, AND THEY ARE WORDS, NOT BURSTS. Write them in the
+     spoken line like any other word — "uh", "um", "ehm", "eh", "er", "hmm", "oh", and in
+     German "äh", "ähm", "öh", "hm", "tja". No brackets and no number: a bracket would make
+     it a sound the model has to invent, and these are things a person SAYS.
+         "I wanted to, uh, tell you something."
+         "Ich wollte dir, ähm, etwas sagen. [0.4 seconds pause] Öh."
+     Use them where the feeling would actually produce one: before something difficult,
+     while a word is being searched for, when someone is caught off guard, when they are
+     stalling because they have not decided yet. Two or three in a reply is plenty and one
+     is often right; a line studded with them reads as a comedy sketch rather than a person.
+     Never in a shout, an order, or anything urgent — panic does not hesitate.
+     They cost you nothing in the ranking: the scorer folds every spelling of them together.
+     NOT WHEN THE WORDS ARE GIVEN TO YOU. If you have been handed a script to perform, the
+     line is fixed and a hesitation sound is an added word — put the hesitation in a pause
+     and a direction instead.
      THIS IS WHAT A SLOW, SAD REPLY LOOKS LIKE WRITTEN OUT — note the square brackets on
-     both kinds of number, and that the silences are longer than the page wants:
+     both kinds of number, the silences sitting BETWEEN WORDS rather than after full stops,
+     and the hesitation sound written as an ordinary word:
          (clearly grieving, held in and only leaking at the edges) [3.4 seconds duration]
-         I still catch myself reaching for the phone. [0.9 seconds pause] (quieter now)
-         [1.6 seconds duration] Every time. [0.7 seconds pause] [2.8 seconds duration]
-         And then I remember, and I put it down again.
+         I still, [0.5 seconds pause] uh, catch myself reaching for the phone.
+         [0.9 seconds pause] (quieter now) [1.6 seconds duration] Every time.
+         [0.7 seconds pause] [2.8 seconds duration] And then I remember, and I
+         [0.4 seconds pause] put it down again.
+     The German equivalent, with its own hesitation sounds:
+         (clearly grieving, held in) [3.2 seconds duration] Ich greife immer noch,
+         [0.5 seconds pause] ähm, nach dem Telefon. [0.9 seconds pause] (leiser jetzt)
+         [1.4 seconds duration] Jedes Mal.
      And a panicked one, where the opposite is true:
          (overwhelmingly afraid, fully unleashed) [1.1 seconds duration] The house is
          burning! [0.2 seconds pause] [1.4 seconds duration] Get the children out, now!

@@ -571,3 +571,52 @@ one go and often quickly. For a horror scene that is right. For a melancholy
 one it is wrong, and asking it explicitly in the chat to slow down and add
 pauses fixed it every time — which means the capability was there and the
 instruction was missing.
+
+## Silence between words, and hesitation sounds
+
+Two additions on 6 September, both aimed at the same thing: a reply that sounds
+thought rather than read.
+
+**Most pauses belong between two words, not between two sentences.** A full stop
+already carries a stop, so silence placed there adds nothing that was not there
+already. The silence that works sits where the sentence is still being built —
+`"I just [0.4 seconds pause] I do not know what to say."` The prompt now asks
+for more of these than of the between-sentence kind, and gives worked examples
+in both languages.
+
+**Hesitation sounds are words, not bursts.** `uh`, `um`, `ehm`, `eh`, `er`,
+`hmm`, `oh`, and in German `äh`, `ähm`, `öh`, `hm`, `tja` — written in the
+spoken line like any other word. A bracket would make one a sound the model has
+to invent; these are things a person *says*. They were verified end to end
+before the rule was written: they survive `_sanitise_script`, they survive
+`render()`, and the speech model performs them.
+
+Two guards came with them.
+
+**The scorer no longer charges for them.** The recogniser writes whichever
+spelling it likes — `ehm` comes back as `um`, `ähm` as `um`, `öh` as `oh` — so
+every hesitation sound now folds to one token before word error is computed.
+Without that, the best-of-N reward multiplies by inverse word error and would
+have pushed the ranking away from exactly the takes that hesitate like a person.
+Measured on one line: 0.12 word error before the fold, 0.059 after. `ß` folds
+to `ss` for the same reason — that was charging German lines for a spelling
+difference the speech model never made (0.20 → 0.067 on the same line).
+
+**Not when the words are given.** On a benchmark item the line is fixed and a
+hesitation sound is an added word, so the rule exempts itself and sends the
+hesitation into a pause and a direction instead.
+
+### How well it is followed
+
+Honestly: **selectively.** Across five probe replies, mid-sentence pauses
+appeared in four (one to two per reply), and a hesitation sound appeared in
+one — `ähm`, in the German reply to *"I have to tell you something and I do not
+know how"*, which is exactly where one belongs. The panicked house-fire reply
+had none, which the rule asks for (*"never in a shout — panic does not
+hesitate"*).
+
+Putting the sounds into the **worked example** rather than only into the rule is
+what produced the first one; the rule alone, sitting 80 % of the way through the
+prompt behind thirty others, produced none in four attempts. That is the same
+pattern the arena study found: an exemplar moves behaviour where a rule does
+not.
