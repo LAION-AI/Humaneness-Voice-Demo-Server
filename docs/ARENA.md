@@ -135,9 +135,9 @@ average — `imperfection` and `subtext` are the two with a positive sign, at
 **Do not push pauses further** until `breath` is retested. It is the only signed
 warning in the run.
 
-**The next run should measure the prompt, not the luck.** Same five blocks on
-every task, fitness = *mean* of takes rather than maximum, and more takes per
-cell. That is what is being run now; this page will be updated with its result.
+**The next run should measure the prompt, not the luck.** That run is now
+complete; see below. It did not change the recommendation — it hardened it, and
+it turned one of the five blocks from a hint into a finding.
 
 ## Everything is on disk
 
@@ -151,3 +151,126 @@ the pooled tables, `paired.py` the ones above.
 
 The exact prompts — the five seeded blocks, the breeding prompt and the judge's
 rubric prompt — are in [`ARENA_PROMPTS.md`](ARENA_PROMPTS.md).
+
+
+---
+
+# The corrected run
+
+Completed 6 September 2026, 05:19. **600 cells, 1,800 clips, 20 tasks, nothing
+dropped.** Three things differ from the run above, each fixing a way the first
+one fooled itself:
+
+* **Every block is evaluated on every arm.** The population is global rather
+  than bred inside a single (task, director) arm, so every block carries n = 40
+  paired comparisons instead of one.
+* **Fitness is the mean of the takes, not the maximum** — the maximum was
+  buying +2.78 points from luck alone.
+* **The control stays in the population in every generation**, so the paired
+  comparison never loses its baseline.
+
+## Generation 1 — the five hypotheses, now at n = 40
+
+| block | mean | vs control | t | p |
+|---|--:|--:|--:|--:|
+| body | 7.97 | +0.03 | +0.07 | 0.947 |
+| **control** | **7.94** | — | | |
+| imperfection | 7.49 | −0.45 | −0.86 | 0.389 |
+| subtext | 7.39 | −0.55 | −1.24 | 0.214 |
+| breath | 6.91 | **−1.03** | −2.34 | **0.019** |
+
+**The control is at the top.** Nothing beat the shipped prompt, and one block is
+measurably worse than it.
+
+## The replication is the result
+
+Generation 1 is the same experiment in both runs, so the two are independent
+replicates of one measurement:
+
+| block | run 1 delta | p | run 2 delta | p | pooled |
+|---|--:|--:|--:|--:|--:|
+| imperfection | **+0.49** | 0.300 | **−0.45** | 0.389 | −0.08 |
+| subtext | **+0.46** | 0.305 | **−0.55** | 0.214 | −0.15 |
+| body | −0.12 | 0.830 | +0.03 | 0.947 | −0.03 |
+| breath | −0.27 | 0.606 | **−1.03** | 0.019 | −0.73 |
+
+**Both of run 1's promising blocks changed sign.** The two we would have shipped
+on a preference — `imperfection` and `subtext` — came back negative when
+measured again. Only `breath` replicated, and it replicated as harm.
+
+That is the whole lesson of these two runs in one table: at this effect size, a
+single well-run experiment is not enough to justify a prompt change. It takes a
+replication to tell +0.5 from −0.5.
+
+## Breeding, again, did not help
+
+| generation | best block | delta | t | p |
+|---|---|--:|--:|--:|
+| gen 1 | body | +0.03 | +0.07 | 0.947 |
+| gen 2 | anchored-burst | +0.21 | +0.46 | 0.647 |
+| gen 3 | anchored-burst | +0.64 | +1.65 | 0.099 |
+
+`anchored-burst` is the only block with a consistent positive sign across two
+generations, and it is the closest thing to a candidate this study produced. It
+is still not significant, and **twelve block-versus-control comparisons were
+computed**, so the Bonferroni threshold here is p < 0.0042. It does not come
+close.
+
+Its text, for the record:
+
+> ONE MORE THING FOR THIS REPLY. Ground the voice in physical action, but keep
+> it strictly fused to speech. Include a single vocal burst — a scoff, a sharp
+> intake, or a dry chuckle — placed immediately ahead of the line that triggers
+> it. Never place bursts or breaths after the final word. Direct the physical
+> posture in round brackets: speaking through a grin, ribs tight, or leaning
+> back. Let posture shape the vocal timbre so the performance sounds produced by
+> muscle.
+
+## More pauses make it worse, and it is the one thing worth acting on
+
+`breath` — *"between two and four pauses, most of them INSIDE sentences"* — is
+negative on **all three rubrics individually** at generation 1:
+
+| rubric | delta | |
+|---|--:|:--|
+| pleasant | −0.28 | p < 0.05 |
+| fit | −0.38 | p < 0.05 |
+| natural | −0.38 | p < 0.05 |
+
+And it is almost entirely the hosted director: **luna −1.83 (t −3.04, p 0.002)**
+against **local −0.23 (t −0.38, p 0.70)**. Luna already writes dense direction,
+and pushing it for more silence degrades the result on every axis.
+
+**What this does and does not say.** `breath` asks for *more* pauses than the
+standing prompt, which already carries the pause rules added on 5 September and
+the `breathe()` floor. So this measures the marginal push beyond the current
+default, and finds it harmful. It does **not** show that the current default is
+itself wrong — that needs a block which *removes* the emphasis, run against the
+same control. **That experiment has not been run.** Until it is, the honest
+position is: do not push pauses further, and treat last week's pause work as
+unvalidated rather than as confirmed.
+
+## Standing differences
+
+| | mean of 15 |
+|---|--:|
+| emotion track | 8.88 |
+| acting_challenge | 7.93 |
+| **voicenet** | **5.93** |
+| luna | 7.62 |
+| local gemma-4-12B | 7.40 |
+
+The VoiceNet gap is nearly three points and no prompt addition in either run
+touched it. That is an adapter problem, not a prompting one.
+
+## Recommendation after both runs
+
+**Ship nothing from this study.** The prompt as it stands was not beaten by any
+of the nineteen blocks tried across two runs and 2,949 rated clips.
+
+**Do not push pauses further** — the only replicated, signed effect in either
+run, significant on all three rubrics and strongest on the hosted director.
+
+**If a follow-up is run**, the two questions worth the GPU time are: does
+*removing* the pause emphasis beat the current prompt, and why does the VoiceNet
+track sit three points below the others.
