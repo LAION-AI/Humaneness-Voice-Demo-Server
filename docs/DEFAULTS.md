@@ -216,3 +216,13 @@ returns the takes unrestored. See `docs/SIDON.md`.
 | `SIDON_ON` | on | **off** | distorts on screams and loud bursts; the +0.43 measurement contained no screaming |
 
 Over budget, burst weights are now **scaled** rather than dropped.
+
+## Changed 6 September 2026 (later the same day)
+
+| setting | was | now | why |
+|---|--:|--:|---|
+| CFG in the UI | off, 2.0 | **on, 3.0** | +2.33 and +1.92 points of 15 across two runs; see `docs/GUIDANCE.md` |
+| `BON_GUIDANCE` | 4.0 | **3.0** | 4.0 is worse than 3.0 on all three rubrics and wins 4 of 12 pairs |
+| `SPEAK_BEST_OF` | — | **10** | `/api/speak` default; a headless caller is not waiting the way a person is |
+| `SPEAK_GUIDANCE` | — | **3.0** | same as the UI |
+| director-set sentence durations | ignored | **honoured, clamped 0.6–1.5×** | see `docs/PROMPTING.md` §Pacing |

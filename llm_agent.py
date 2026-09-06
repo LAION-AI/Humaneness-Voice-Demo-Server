@@ -330,7 +330,10 @@ its cues removed, so "script" must contain the complete line, exactly as you wan
      silence inside a sentence sounds like a person thinking while they talk.
      AT LEAST ONE PAUSE IN EVERY REPLY SITS INSIDE A SENTENCE, not between two.
    - THE CLOCK IS PART OF THE ACTING. Before you write a sentence, decide how long it
-     should take, and write that in front of it as [N.N seconds duration]. If you leave it
+     should take, and write that in front of it as [N.N seconds duration] — SQUARE
+     brackets, like a pause, because square brackets are seconds and round ones are
+     performance. "(4.8 seconds duration)" is not a duration; it is a bracket the model
+     reads as an instruction and it does nothing. If you leave it
      off the server times the sentence for you at an even, average pace — which is the one
      thing a feeling never is. A panicked line and a grieving line of the same length are
      not the same length out loud.
@@ -342,9 +345,11 @@ its cues removed, so "script" must contain the complete line, exactly as you wan
      phrase. Someone who is not sure they want to say this at all takes longer to get there
      than the words need.
      The number is a request inside a range: the server will not stretch a line past about
-     twice its natural length or squeeze it under about two thirds, because this model spends
-     whatever time it is given and a wildly long budget comes back as filler, not as silence.
-     To go slower than that, put the extra time in PAUSES, which is where it belongs anyway.
+     one and a half times its natural length, or squeeze it under about two thirds. Measured —
+     at twice the natural length one take in four comes back with invented words, and at two
+     and a half times most of them do. This model spends whatever time it is given, so a long
+     budget becomes filler rather than silence. TO GO SLOWER THAN THAT, PUT THE TIME IN
+     PAUSES, where silence stays silence.
    - MATCH THE PAUSES TO THE FEELING TOO, not just to the grammar. A few hundred
      milliseconds is the normal unit and it should appear several times in a reply; longer
      when the feeling asks for it.
@@ -355,6 +360,15 @@ its cues removed, so "script" must contain the complete line, exactly as you wan
      Put them where a person actually stops: between the words while the thought is still
      arriving, not only at the punctuation. Real speech breaks mid-clause constantly — that
      is what makes it sound thought rather than read.
+     THIS IS WHAT A SLOW, SAD REPLY LOOKS LIKE WRITTEN OUT — note the square brackets on
+     both kinds of number, and that the silences are longer than the page wants:
+         (clearly grieving, held in and only leaking at the edges) [3.4 seconds duration]
+         I still catch myself reaching for the phone. [0.9 seconds pause] (quieter now)
+         [1.6 seconds duration] Every time. [0.7 seconds pause] [2.8 seconds duration]
+         And then I remember, and I put it down again.
+     And a panicked one, where the opposite is true:
+         (overwhelmingly afraid, fully unleashed) [1.1 seconds duration] The house is
+         burning! [0.2 seconds pause] [1.4 seconds duration] Get the children out, now!
    - PUNCTUATION IS PERFORMANCE, SO PUNCTUATE LIKE ONE. The voice model reads it: the marks at
      the end of a sentence shape its final contour, and its pace and pitch inside. Use the full
      range rather than a tidy full stop every time:

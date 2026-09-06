@@ -522,18 +522,35 @@ used to strip every duration tag and recompute the number from the word count,
 so a director told to slow a melancholy line down was writing into a field the
 server threw away. Durations written by the director are now kept.
 
-They are a request inside a range. `render()` clamps to **0.6× to 2.0× of the
+They are a request inside a range. `render()` clamps to **0.6× to 1.5× of the
 natural length** and logs when the clamp bites:
 
 ```
 [timed] asked for 4.5s on 6 words, using 3.8s (natural 1.9s)
 ```
 
-The range is not arbitrary — it is what the global `speed` field already spans
-(`much_slower` 0.5 to `much_faster` 1.5). Beyond it the budget stops being a
-request: this model spends whatever time it is given, so a wildly long sentence
-budget comes back as filler rather than as silence. Extra time belongs in
-pauses, where silence is silence.
+The ceiling is measured, not guessed. One fixed eight-word line, four seeds a
+cell, word error against the intended text:
+
+| duration | 1.0× | 1.5× | 2.0× | 2.5× | 3.0× |
+|---|--:|--:|--:|--:|--:|
+| median word error | 0.00 | 0.00 | **0.06** | 0.50 | 0.75 |
+
+At twice the natural length one take in four comes back with invented words; at
+two and a half times most of them do. This model spends whatever time it is
+given, so past about 1.5× the budget stops being silence and becomes filler.
+Extra slowness belongs in pauses, where silence stays silence.
+
+**The director also had to be told which bracket.** The first three turns after
+these rules were added all wrote `(4.8 seconds duration)` in round brackets —
+which the format reads as a delivery direction, so it was parsed as prose and
+dropped. The prompt now says square brackets in as many words, and `parse()`
+moves a round one rather than losing it.
+
+Measured after both fixes, words per second across four turns: **2.40** for a
+quiet remembered afternoon, **2.56** for a house fire, **2.73** for a German
+line about missing someone, **3.19** for a funny story. Before, every reply sat
+at about 2.85 regardless of what it was about.
 
 The prompt gives the director the mapping to reason with:
 

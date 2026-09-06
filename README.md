@@ -72,6 +72,7 @@ present without downloading anything.
 | [`docs/ADAPTERS.md`](docs/ADAPTERS.md) | every adapter set, its weight, and why merging is unsafe on this checkpoint |
 | [`docs/DEFAULTS.md`](docs/DEFAULTS.md) | every shipped setting and what changed it |
 | [`docs/BEST_OF_N.md`](docs/BEST_OF_N.md) | how candidates are generated and ranked |
+| [`docs/GUIDANCE.md`](docs/GUIDANCE.md) | classifier-free guidance: measured twice, 3.0 beats both 1.0 and 4.0 |
 | [`docs/ALIGNMENT.md`](docs/ALIGNMENT.md) | end trimming with a forced aligner |
 | [`docs/SIDON.md`](docs/SIDON.md) | speech restoration: what it improves, and what it leaves exactly as it was |
 | [`docs/BABBLE.md`](docs/BABBLE.md) | two ways a line came back unintelligible, and the budgets that fix them |

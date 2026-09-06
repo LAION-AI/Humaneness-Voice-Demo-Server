@@ -164,6 +164,13 @@ def parse(script):
     # slow a melancholy line down was writing into a field the server threw
     # away.  `render` clamps it; see `_seconds_for`.
     s = str(script or "")
+    # A duration written in ROUND brackets is a direction by the format's own
+    # rule, so it was read as prose and then dropped, and the director's pacing
+    # went with it.  Measured on the first three turns after the pacing rules
+    # were added: every duration came back as "(4.8 seconds duration)".  Move
+    # it rather than lose it.
+    s = re.sub(r"\(\s*([0-9]*\.?[0-9]+)\s*(?:s|sec|seconds?)?\s+duration\s*\)",
+               r"[\1 seconds duration]", s, flags=re.I)
     items, pos = [], 0
     marks = []
     for m in _DUR_RE.finditer(s):
@@ -235,13 +242,15 @@ def render(script, speed=1.0, budget_frames=None):
                     continue
                 secs = _seconds_for(words, speed)
                 if want_secs is not None:
-                    # Honour it, but inside the range the global speed setting
-                    # already spans: `much_slower` is 0.5 and `much_faster` 1.5,
-                    # so 0.6x to 2.0x of natural is territory the model has
-                    # been driven through before.  Beyond that the duration
-                    # budget stops being a request and becomes filler — this
-                    # model spends the time it is given.
-                    lo, hi = secs * 0.6, secs * 2.0
+                    # Honour it, but only as far as the model can carry it.
+                    # Measured on a fixed eight-word line, four seeds a cell,
+                    # word error against the intended text:
+                    #   1.0x 0.00   1.5x 0.00   2.0x 0.06   2.5x 0.50   3.0x 0.75
+                    # This model spends whatever time it is given, so past about
+                    # 1.5x the budget stops being silence and becomes invented
+                    # words.  Extra slowness belongs in pauses, where silence
+                    # stays silence.
+                    lo, hi = secs * 0.6, secs * 1.5
                     got = min(max(want_secs, lo), hi)
                     if abs(got - want_secs) > 0.05:
                         print(f"[timed] asked for {want_secs:.1f}s on "
