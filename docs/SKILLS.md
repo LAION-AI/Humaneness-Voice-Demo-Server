@@ -119,7 +119,9 @@ a different line each time rather than the adapter:
 
 It is a **cliff, not a slope**: flat to 1.5, then intelligibility collapses. Nine
 recipes ask for 2.0 or 2.3 — `chuckle`, `sharp_inhale`, `soft_hum` among them —
-and every one is on the far side of it here. `BURST_LAM_MAX` is therefore 1.5,
+and every one is on the far side of it here. `BURST_LAM_MAX` was therefore 1.5, and is **1.25** since 6 September under a
+total budget of 2.0 — see [`BABBLE.md`](BABBLE.md), where two adapters at 1.5
+each destroyed the line in 5 of 5 seeds. It is the sum that breaks a line here,
 with a slider in the page to hear the recipe weights.
 
 This does not contradict the study. Its ladder measured **one** adapter, for

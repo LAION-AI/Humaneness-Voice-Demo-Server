@@ -76,6 +76,7 @@ present without downloading anything.
 | [`docs/ALIGNMENT.md`](docs/ALIGNMENT.md) | end trimming with a forced aligner |
 | [`docs/SIDON.md`](docs/SIDON.md) | speech restoration: what it improves, and what it leaves exactly as it was |
 | [`docs/BABBLE.md`](docs/BABBLE.md) | two ways a line came back unintelligible, and the budgets that fix them |
+| [`docs/SEPTEMBER.md`](docs/SEPTEMBER.md) | a working log of 5-6 September: every change, the measurement behind it, and the script that reproduces it |
 | [`docs/CONTEXT.md`](docs/CONTEXT.md) | the context window, the 400 it caused, and the guard |
 | [`docs/BENCHMARK.md`](docs/BENCHMARK.md) | performing a JSON benchmark item, and the verbatim guarantee |
 | [`docs/SKILLS.md`](docs/SKILLS.md) | the measured vocal-burst recipes and where they come from |

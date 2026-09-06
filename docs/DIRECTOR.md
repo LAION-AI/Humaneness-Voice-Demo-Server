@@ -330,6 +330,14 @@ The director does not name the adapter; it writes the sound.
 3. With skills **off** — the flat fallback for every class, so the two settings
    are comparable rather than half-mixed.
 4. In all cases the result is capped at `BURST_LAM_MAX`, default **2.3**, which
+
+> **Note added on the demo side, 6 September 2026.** The weights this page
+> assumes are not the ones this server runs. `BURST_LAM_MAX` is **1.25**
+> here, under a **total** budget of 2.0 across a turn, because two burst
+> adapters at 1.5 each destroyed the line in 5 of 5 seeds under the full
+> shipped stack — it is the sum that breaks it, not the single weight.
+> See [`BABBLE.md`](BABBLE.md).
+
    changes nothing today. See the note in `config.py`: the 2026-09-05 addendum
    argues for 1.5 and the table above it has not been rewritten to match.
 

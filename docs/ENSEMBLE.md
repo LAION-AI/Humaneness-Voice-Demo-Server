@@ -506,6 +506,14 @@ Recorded here because they are load-bearing and currently open.
    states that no recipe should name it; the §51/52 table above it still carries
    ten recipes at 1.8–2.3, and that table is what `skills.py` parses and serves.
    `BURST_LAM_MAX` exists as a one-variable switch (default 2.3, i.e. no change);
+
+> **Note added on the demo side, 6 September 2026.** The weights this page
+> assumes are not the ones this server runs. `BURST_LAM_MAX` is **1.25**
+> here, under a **total** budget of 2.0 across a turn, because two burst
+> adapters at 1.5 each destroyed the line in 5 of 5 seeds under the full
+> shipped stack — it is the sum that breaks it, not the single weight.
+> See [`BABBLE.md`](BABBLE.md).
+
    setting it to 1.5 enforces the addendum.
 4. **Three prompt rules are unenforced**: a number inside a round bracket, the
    ten-word minimum, and opening on a burst. The first is the dangerous one — it

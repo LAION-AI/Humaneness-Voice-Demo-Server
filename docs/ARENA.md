@@ -278,5 +278,7 @@ track sit three points below the others.
 **And the lever that did work was not a prompt at all.** Nineteen prompt
 additions moved nothing that survived a paired comparison; SIDON restoration
 moved `pleasant` by +0.43 of 5 at p < 0.001 on the first attempt, with no search
-and no tuning. It is now on by default. See [`SIDON.md`](SIDON.md) — including
-the hypothesis that the adapter stack is what it is compensating for.
+and no tuning. It shipped on for that reason and was turned back off a day
+later, when a listener found it distorts on screams and loud bursts — the clips
+behind the measurement contained none. See [`SIDON.md`](SIDON.md), including the
+hypothesis that the adapter stack is what it is compensating for.

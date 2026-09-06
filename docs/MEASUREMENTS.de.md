@@ -316,3 +316,52 @@ Sweep: 0.0 → 0.17, 0.15 → 0.39, **0.3 → 0.61**, darüber flach. 0.3 ist de
 ### Schalter
 „Emotion nuances" (beide Demos, standardmäßig an) steuert nur den Emotions-
 Adapter. Aus bleibt: sft3-Basis + abgerufener Referenzclip, sonst nichts.
+
+---
+
+# Nachtrag 5.–6. September 2026
+
+Ausführlich, mit Reproduktionsskript zu jedem Punkt, steht das in
+[`SEPTEMBER.md`](SEPTEMBER.md). Hier die Kurzfassung auf Deutsch.
+
+**Die wichtigste Erkenntnis ist methodisch:** ein ausgeschriebenes Beispiel
+bewegt diesen Regisseur, eine Regel nicht. Dieselbe Anweisung brachte null
+Wirkung als Regel unter dreißig anderen, ~1 Pause pro Antwort mit einem
+Beispiel, und 1–3 mit einem Beispielpaar pro Gefühl. Das gilt auch umgekehrt:
+neunzehn Prompt-Zusätze aus zwei Suchläufen (2.949 bewertete Clips) haben
+**nichts** bewegt, was einen gepaarten Vergleich übersteht — und die zwei, die
+im ersten Lauf vielversprechend aussahen, kippten im zweiten das Vorzeichen.
+
+**Vier echte Fehler gefunden und behoben.** Die Bereinigung löschte jede Pause
+hinter einer runden Klammer, also auch hinter einer Regieanweisung — genau dort,
+wo die erste Stille eines Satzes steht. Die Innenpausen-Prüfung hielt eine Pause
+am Satzanfang für eine im Satz und schaltete damit den Boden ab. Der Renderer
+verwarf jede vom Regisseur geschriebene Satzdauer. Und die Budget-Skalierung für
+Burst-Adapter wurde danach wieder überschrieben.
+
+**Zwei Ursachen für unverständliches Audio**, beide gemessen: im Englischen die
+**Summe** der Burst-Adapter (zwei à 1.5 zerstören die Zeile in 5 von 5 Seeds;
+Budget jetzt 2.0 statt 3.0, Einzelgewicht 1.25 statt 1.5, und über Budget wird
+skaliert statt verworfen). Im Deutschen die **Sprache der Klammern** — deutsche
+Regieanweisungen liegen außerhalb der Verteilung des Korpus, Median-WER 0.267
+gegen 0.000 bei identischem deutschen Wortlaut mit englischen Cues. Beides in
+[`BABBLE.md`](BABBLE.md).
+
+**Guidance 3.0** ist jetzt Standard, zweimal gemessen: +2.33 und +1.92 Punkte
+von 15 gegen keine Guidance, und **4.0 ist schlechter als 3.0** (−1.25, auf
+allen drei Rubriken, gewinnt 4 von 12 Paaren). Deutsch profitiert deutlich
+stärker als Englisch. Details in [`GUIDANCE.md`](GUIDANCE.md).
+
+**SIDON** hebt als einziger gemessener Hebel die Klangqualität (+0.43 von 5,
+p < 0.001) und lässt Natürlichkeit und Passung unberührt. Es lief einen Tag als
+Standard und ist wieder **aus**: bei Schreien und lauten Bursts verzerrt es, und
+die 21 Messclips enthielten kein Schreien.
+
+**Das Tempo folgt jetzt dem Gefühl.** Der Regisseur setzt `speed` für die Szene
+und schreibt Satzdauern; die Obergrenze von 1.5× ist gemessen (ab 2× kommt in
+einer von vier Aufnahmen erfundener Text zurück, ab 2.5× in den meisten).
+
+**Offen geblieben:** Füllwörter erscheinen nur in etwa jeder vierten bis fünften
+Antwort — bewusst nicht erzwungen, weil eingefügte Stille umkehrbar ist und
+eingefügte Wörter nicht. Der VoiceNet-Track liegt bei 5.93 von 15 gegen 8.88 der
+Emotions-Aufgaben, was auf die Adapter zeigt, nicht auf den Prompt.

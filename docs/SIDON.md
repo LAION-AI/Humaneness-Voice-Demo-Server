@@ -66,7 +66,13 @@ both of the promising ones from the first run changed sign when measured again.
 SIDON moves `pleasant` by **+0.43 of 5 at p < 0.001** on the first attempt, with
 no tuning and no search. On the one axis it touches it is not merely the best
 lever in these studies — it is the only one that produced a significant effect
-at all. That is why it is on by default.
+at all. It was shipped **on** for that reason and turned back **off** on
+6 September after a listening report: on screams and loud vocal bursts it
+distorts. The twenty-one clips behind the +0.43 were drawn across the score
+range of an ordinary conversational run and contained no screaming, so the
+number is right for ordinary speech and silent about the loud tail — which is
+exactly where a restoration model trained on clean read speech has least
+support. Turn it on by hand for a quiet take.
 
 It is worth being exact about the scope: this is a claim about **how the voice
 sounds**, not about how well it acts. `fit` and `natural` do not move, and the
@@ -118,7 +124,8 @@ protocol. The UI says so on the toggle.
 | CFG sweep | each guidance value is restored, and both versions appear under it |
 
 The `sidon` boolean on `/api/turn`, `/api/cfg_sweep` and the UI checkbox all
-default to `SIDON_ON`, which ships **on**. Turning it off restores streaming.
+default to `SIDON_ON`, which ships **off** (see above). Turning it on costs
+the streaming.
 
 ### It runs in its own process, and that is not an accident
 
