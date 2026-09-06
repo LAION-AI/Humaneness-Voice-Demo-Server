@@ -1334,14 +1334,26 @@ async def _turn(body):
                 # only here to be restored must not silently acquire a 1.93x
                 # cost it never asked for.  `_gv_req` carries what was asked.
                 gv = _gv_req
-                if gv > 1.0001 and out.get("general_unc"):
+                if gv > 1.0001:
+                    # The director is asked for a neutralised delivery line and
+                    # does not always return one.  Guidance used to fall back to
+                    # 1.0 when it was missing, silently — a best-of-N run that
+                    # reported g=3.0 in the UI and had actually generated
+                    # unguided.  The script neutralisation alone already gives
+                    # the two branches something to differ by, which is what
+                    # /api/cfg_sweep has always done, so fall back to the same
+                    # GENERAL rather than to no guidance at all.
                     _gu = timed_script.general_line(
-                        out["general_unc"], _fr / config.FRAME_RATE, lc, None)
+                        out.get("general_unc") or out.get("general") or "",
+                        _fr / config.FRAME_RATE, lc, None)
                     _tu = timed_script.neutralise(_tg)
-                    item["instruction_unc"] = f"GENERAL: {_gu}\nSCRIPT:\n{_tu}"
-                    item["text_unc"] = _tu
-                else:
-                    gv = 1.0
+                    if _tu.strip() and _tu != _tg:
+                        item["instruction_unc"] = f"GENERAL: {_gu}\nSCRIPT:\n{_tu}"
+                        item["text_unc"] = _tu
+                    else:
+                        print("[bestofn] nothing to neutralise; guidance off",
+                              flush=True)
+                        gv = 1.0
                 t_bon = time.time()
 
                 _seed0 = int(body.get("seed") or 1234)

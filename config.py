@@ -424,7 +424,13 @@ HOSTED_MODELS = {
     "luna": "gpt-5.6-luna",
     "gemini-flash": "gemini-3-flash",
     "gemini-flash-lite": "gemini-3.5-flash-lite",
+    "glm": "glm-5.3",
 }
+# Models whose endpoint takes `max_tokens` rather than `max_completion_tokens`.
+# glm-5.3 documents exactly five parameters and `max_completion_tokens` is not
+# among them; sending it there is a silently ignored cap, which is how a reply
+# comes back truncated mid-JSON with nothing in the log.
+HOSTED_PLAIN_MAX_TOKENS = {"glm-5.3"}
 # no deliberation needed for a character decision, and it halves the latency
 HOSTED_REASONING = os.environ.get("MOSS_HOSTED_REASONING", "none")
 HOSTED_MAX_TOKENS = int(os.environ.get("MOSS_HOSTED_MAX_TOKENS", "3000"))

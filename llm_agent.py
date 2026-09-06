@@ -1048,7 +1048,10 @@ class LLMAgent:
             # The cap counts reasoning tokens too, even at effort=none, so a
             # 512 budget silently truncated the JSON mid-string on flash-lite.
             body.pop("max_tokens", None)
-            body["max_completion_tokens"] = config.HOSTED_MAX_TOKENS
+            if self.model in getattr(config, "HOSTED_PLAIN_MAX_TOKENS", ()):
+                body["max_tokens"] = config.HOSTED_MAX_TOKENS
+            else:
+                body["max_completion_tokens"] = config.HOSTED_MAX_TOKENS
             body["reasoning_effort"] = config.HOSTED_REASONING
             if self.style == "codes":
                 # strict mode there requires additionalProperties:false everywhere
@@ -1064,6 +1067,17 @@ class LLMAgent:
         t0 = time.time()
         r = await self.client.post(f"{self.base}/v1/chat/completions",
                                    json=body, headers=headers)
+        # Some hosted models return an intermittent 400 whose own message says
+        # to try again — glm-5.3 did so on one turn in three with a body that
+        # was byte-identical to two that succeeded.  One retry, only for a
+        # hosted model, and only when the body is not the thing at fault.
+        if (r.status_code == 400 and self.hosted_model
+                and "client_side_error" in (r.text or "")):
+            print(f"[llm] {self.model} returned a retryable 400, trying once "
+                  f"more", flush=True)
+            await asyncio.sleep(1.0)
+            r = await self.client.post(f"{self.base}/v1/chat/completions",
+                                       json=body, headers=headers)
         ms = (time.time() - t0) * 1000
         if r.status_code >= 400:
             # A bare "400 Bad Request" says nothing; llama.cpp puts the actual
