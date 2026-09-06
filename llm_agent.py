@@ -329,6 +329,32 @@ its cues removed, so "script" must contain the complete line, exactly as you wan
      way past it. That is the whole difference. Sentences separated by silence sound like a list;
      silence inside a sentence sounds like a person thinking while they talk.
      AT LEAST ONE PAUSE IN EVERY REPLY SITS INSIDE A SENTENCE, not between two.
+   - THE CLOCK IS PART OF THE ACTING. Before you write a sentence, decide how long it
+     should take, and write that in front of it as [N.N seconds duration]. If you leave it
+     off the server times the sentence for you at an even, average pace — which is the one
+     thing a feeling never is. A panicked line and a grieving line of the same length are
+     not the same length out loud.
+       * panic, urgency, an order        — fast and clipped, and the pauses almost vanish
+       * anger held in                    — slower than it wants to be, the control audible
+       * grief, melancholy, exhaustion    — slow, and the silences do most of the work
+       * amusement, telling a story       — uneven: quick through the setup, slack at the joke
+     Ask yourself what the person's body is doing. Someone out of breath cannot hold a long
+     phrase. Someone who is not sure they want to say this at all takes longer to get there
+     than the words need.
+     The number is a request inside a range: the server will not stretch a line past about
+     twice its natural length or squeeze it under about two thirds, because this model spends
+     whatever time it is given and a wildly long budget comes back as filler, not as silence.
+     To go slower than that, put the extra time in PAUSES, which is where it belongs anyway.
+   - MATCH THE PAUSES TO THE FEELING TOO, not just to the grammar. A few hundred
+     milliseconds is the normal unit and it should appear several times in a reply; longer
+     when the feeling asks for it.
+       * panic          0.15 to 0.3, and few of them — there is no time to stop
+       * everyday talk  0.3 to 0.5, scattered, mostly mid-clause
+       * melancholy     0.6 to 1.0, and more of them than feels right on the page
+       * a hard thing   up to 1.5 before the word someone does not want to say
+     Put them where a person actually stops: between the words while the thought is still
+     arriving, not only at the punctuation. Real speech breaks mid-clause constantly — that
+     is what makes it sound thought rather than read.
    - PUNCTUATION IS PERFORMANCE, SO PUNCTUATE LIKE ONE. The voice model reads it: the marks at
      the end of a sentence shape its final contour, and its pace and pitch inside. Use the full
      range rather than a tidy full stop every time:
@@ -823,9 +849,13 @@ class LLMAgent:
         return msgs, max_tokens
 
     async def turn(self, message, history=None, max_tokens=512, persona=None,
-                   heard=None, identity=None):
+                   heard=None, identity=None, extra=None):
         """One acting turn -> (parsed dict, latency ms, raw text)."""
         system = self.system
+        if extra:
+            # An experiment knob: an extra block appended to the standing rules,
+            # so prompt variants can be compared without editing the prompt.
+            system = system + "\n\n" + str(extra).strip()
         if persona:
             # the character brief goes first; the acting machinery below it is
             # unchanged, so a persona changes who speaks, not what it can do

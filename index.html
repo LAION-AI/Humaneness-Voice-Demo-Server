@@ -279,10 +279,10 @@
       <input id="bsdpos" type="range" min="0" max="2" step="0.05" value="1.0"
              style="width:70px"><b id="bsdposv">1.00</b></label>
     <label title="Classifier-free guidance: der Satz wird zweimal gerechnet, einmal mit und einmal ohne Regieanweisung, und der Unterschied wird verstaerkt. Kostet ~1.9x Rechenzeit und streamt deshalb nicht.">
-      <input type="checkbox" id="cfg"> CFG <i>(Guidance)</i></label>
+      <input type="checkbox" id="cfg" checked> CFG <i>(Guidance)</i></label>
     <label title="Wie stark der Unterschied zwischen beiden Zweigen verstaerkt wird. 1.0 = aus.">
       CFG-Staerke
-      <input id="cfgs" type="range" min="1" max="5" step="0.25" value="2.0">
+      <input id="cfgs" type="range" min="1" max="5" step="0.25" value="3.0">
       <b id="cfgsv">2.00</b></label>
     <label title="Statt einer Fassung mehrere erzeugen, die sich NUR im CFG-Faktor unterscheiden. Nichts spielt automatisch; du klickst die Fassungen im Chat an.">
       <input type="checkbox" id="cfgsweep"> CFG-Sweep <i>(mehrere Faktoren)</i></label>

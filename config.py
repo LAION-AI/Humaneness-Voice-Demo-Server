@@ -114,6 +114,69 @@ SPEED_WORDS = {"much_slower": 0.5, "slower": 0.75, "normal": 1.0,
 ASSETS = os.environ.get("MOSS_ASSETS", "/mnt/nvme/moss-15-v2-assets/loras")
 
 
+# Every adapter set this box keeps as a plain directory also exists on the hub.
+# Without the mapping a fresh clone finds an empty string, loads no adapters and
+# gives no reason, which is the least useful way for this to fail.
+HUB_FOR_ROOT = {
+    "sft3_dpo":      "laion/moss-va-sft3-dpo-lora-p2",
+    "sft3_voice":    "laion/moss-va-sft3-voice-loras",
+    "sft3_emotion":  "laion/moss-va-sft3-emotion-loras",
+    "sft3_voicenet": "laion/moss-va-sft3-voicenet-lora-adapters",
+    "sft3_quality":  "laion/moss-va-sft3-quality-lora-adapters",
+    "sft3_qdpo":     "laion/moss-va-sft3-quality-dpo-lora",
+    "burst":         "laion/moss-va-sft3-vocal-burst-lora-adapters",
+    "burst_v2":      "laion/moss-va-sft3-vocal-burst-lora-adapters-v2",
+    "burst_v2_top1": "laion/moss-va-sft3-vocal-burst-lora-adapters-v2",
+    "burst_grp":     "laion/moss-va-sft3-vocal-burst-lora-adapters-v2",
+    "burst_grp25":   "laion/moss-va-sft3-vocal-burst-lora-adapters-v2",
+    "burst_abl":     "laion/moss-va-sft3-vocal-burst-lora-adapters-v2",
+    "burst_dose":    "laion/moss-va-sft3-vocal-burst-lora-adapters-v2",
+    "profile":       "laion/moss-voice-profile-loras-500",
+    "character":     "TTS-AGI/moss-character-loras-refined-public",
+    "speaker":       "TTS-AGI/moss-voice-lora-velvet-sage-baritone",
+    "sports":        "laion/moss-sports-commentator-lora",
+}
+
+
+def _hub_dir(repo, sub=None):
+    """The snapshot for `repo` if it is already downloaded, else "".
+
+    Looks in HF_HOME as well as the default cache, because this box keeps its
+    models on a second disk and a fresh machine will not.
+    """
+    roots = [os.environ.get("HF_HOME"), os.path.expanduser("~/.cache/huggingface")]
+    for r in roots:
+        if not r:
+            continue
+        hub = os.path.join(r, "hub") if not r.rstrip("/").endswith("hub") else r
+        hits = sorted(glob.glob(os.path.join(
+            hub, f"models--{repo.replace('/', '--')}", "snapshots", "*")))
+        if hits:
+            d = hits[-1]
+            return os.path.join(d, sub) if sub and os.path.isdir(
+                os.path.join(d, sub)) else d
+    return ""
+
+
+def _root(kind, local, sub=None):
+    """A plain directory if this box has one, otherwise the hub copy.
+
+    Prints one line naming the repo and the fetcher when neither exists, so a
+    fresh clone says what is missing instead of quietly running without it.
+    """
+    if local and os.path.isdir(local):
+        return local
+    repo = HUB_FOR_ROOT.get(kind)
+    if repo:
+        d = _hub_dir(repo, sub)
+        if d:
+            return d
+        print(f"[config] adapter set '{kind}' not found. It is "
+              f"{repo} on the hub — run: python setup/fetch_all.py",
+              flush=True)
+    return ""
+
+
 def _snap(repo, local=None):
     """Prefer a plain directory under ASSETS, fall back to the HF cache.
 
@@ -138,7 +201,7 @@ LORA_ROOTS = {
     "character": _snap("TTS-AGI/moss-character-loras-refined-public"),
     # SFT3-native burst adapters (71), replacing the v2-era set.
     # "burst":   _snap("laion/vocal-burst-lora-adapters", "bursts"),
-    "burst":     "/mnt/nvme/moss-15-v2-assets/loras/sft3_burst",
+    "burst":     _root("burst", "/mnt/nvme/moss-15-v2-assets/loras/sft3_burst"),
     # The 57-dimension VoiceNet set is trained against the *untuned* v2 weights
     # and is off-distribution on SFT3.  Parked, not deleted — restore this line
     # and BASE_STYLE_LORAS below to bring it back.
@@ -146,22 +209,22 @@ LORA_ROOTS = {
     # 16 tails of the axes that actually vary with delivery, trained against
     # SFT3 itself.  Each is the top (or bottom) 1 % of a 3.1 M-utterance corpus
     # along one axis.
-    "sft3_voicenet": "/mnt/nvme/moss-15-v2-assets/loras/sft3_voicenet",
+    "sft3_voicenet": _root("sft3_voicenet", "/mnt/nvme/moss-15-v2-assets/loras/sft3_voicenet"),
     # genuineness / vocal-burst blend / aesthetics, one per perceptual axis
-    "sft3_quality":  "/mnt/nvme/moss-15-v2-assets/loras/sft3_quality",
+    "sft3_quality":  _root("sft3_quality", "/mnt/nvme/moss-15-v2-assets/loras/sft3_quality"),
     # Two preference-tuned adapters, both rank 16.  Each targets audio_lm_heads
     # 0-11 AND text_lm_head -- 12 of its 23 modules are weight-tied, so all
     # twelve are hooked rather than merged (see docs/ADAPTERS.md).
-    "sft3_qdpo":     "/mnt/nvme/moss-15-v2-assets/loras/sft3_qdpo",
+    "sft3_qdpo":     _root("sft3_qdpo", "/mnt/nvme/moss-15-v2-assets/loras/sft3_qdpo"),
     # The v2 burst release: 105 adapters in six arms.  Registered so every one is
     # addressable by name from the overlay and from `adapter_overrides`; which
     # set the AUTOMATIC burst resolution uses is a separate switch, below.
-    "burst_v2":      "/mnt/nvme/moss-15-v2-assets/loras/_v2raw/per_class",
-    "burst_v2_top1": "/mnt/nvme/moss-15-v2-assets/loras/_v2raw/per_class_top1",
-    "burst_grp":     "/mnt/nvme/moss-15-v2-assets/loras/_v2raw/groups_full",
-    "burst_grp25":   "/mnt/nvme/moss-15-v2-assets/loras/_v2raw/groups_dose25",
-    "burst_abl":     "/mnt/nvme/moss-15-v2-assets/loras/_v2raw/ablation",
-    "burst_dose":    "/mnt/nvme/moss-15-v2-assets/loras/_v2raw/dose",
+    "burst_v2":      _root("burst_v2", "/mnt/nvme/moss-15-v2-assets/loras/_v2raw/per_class", "per_class"),
+    "burst_v2_top1": _root("burst_v2_top1", "/mnt/nvme/moss-15-v2-assets/loras/_v2raw/per_class_top1", "per_class_top1"),
+    "burst_grp":     _root("burst_grp", "/mnt/nvme/moss-15-v2-assets/loras/_v2raw/groups_full", "groups_full"),
+    "burst_grp25":   _root("burst_grp25", "/mnt/nvme/moss-15-v2-assets/loras/_v2raw/groups_dose25", "groups_dose25"),
+    "burst_abl":     _root("burst_abl", "/mnt/nvme/moss-15-v2-assets/loras/_v2raw/ablation", "ablation"),
+    "burst_dose":    _root("burst_dose", "/mnt/nvme/moss-15-v2-assets/loras/_v2raw/dose", "dose"),
     "sports":    _snap("laion/moss-sports-commentator-lora"),
     # the anchor speaker as a trained adapter — the direct route to a consistent
     # voice, as opposed to converting after the fact
@@ -175,9 +238,9 @@ LORA_ROOTS = {
     # add_weighted_adapter refuses the combination and the three are activated
     # and scaled separately.  Merging deltas, as this bank does, has no such
     # constraint.
-    "sft3_dpo":     "/mnt/nvme/moss-15-v2-assets/loras/sft3_dpo",
-    "sft3_voice":   "/mnt/nvme/moss-15-v2-assets/loras/sft3_voice",
-    "sft3_emotion": "/mnt/nvme/moss-15-v2-assets/loras/sft3_emotion",
+    "sft3_dpo":     _root("sft3_dpo", "/mnt/nvme/moss-15-v2-assets/loras/sft3_dpo"),
+    "sft3_voice":   _root("sft3_voice", "/mnt/nvme/moss-15-v2-assets/loras/sft3_voice"),
+    "sft3_emotion": _root("sft3_emotion", "/mnt/nvme/moss-15-v2-assets/loras/sft3_emotion"),
 }
 
 # Which adapter set the speaker comes from.  The sft3 voice adapters were trained
@@ -952,3 +1015,12 @@ SIDON_TIMEOUT = float(os.environ.get("MOSS_SIDON_TIMEOUT", "120"))
 # prompt has asked for this all along and the director does not comply on German
 # turns, so the server rewrites them before the reference is retrieved.
 ENGLISH_CUES = os.environ.get("MOSS_ENGLISH_CUES", "1") not in ("0", "false")
+
+
+# ----------------------------------------------------------------- speak ----
+# `/api/speak` is the whole demo behind one request: text in, MP3 out.  Its
+# defaults are deliberately the UI's, so a bare curl gives what the browser
+# gives.  Best-of is higher here than the UI's 8 because a headless caller is
+# not sitting and waiting the way a person in a chat window is.
+SPEAK_BEST_OF = int(os.environ.get("MOSS_SPEAK_BEST_OF", "10"))
+SPEAK_GUIDANCE = float(os.environ.get("MOSS_SPEAK_GUIDANCE", "3.0"))

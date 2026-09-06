@@ -508,3 +508,49 @@ throughout"*, *"genuine, not acted"*), which was done to keep the line close to
 the guide's one-line example. These exact words are what the training corpus was
 captioned with, and a paraphrase of a caption is a different conditioning signal
 from the caption.
+
+## Pacing: the clock is part of the acting
+
+The director now decides how long each sentence takes and writes it in front of
+the sentence as `[N.N seconds duration]`. Leave it off and the server times the
+sentence at an even average pace — which is the one thing a feeling never is. A
+panicked line and a grieving line of the same word count are not the same length
+out loud.
+
+**This required a change in the renderer, not only in the prompt.** `parse()`
+used to strip every duration tag and recompute the number from the word count,
+so a director told to slow a melancholy line down was writing into a field the
+server threw away. Durations written by the director are now kept.
+
+They are a request inside a range. `render()` clamps to **0.6× to 2.0× of the
+natural length** and logs when the clamp bites:
+
+```
+[timed] asked for 4.5s on 6 words, using 3.8s (natural 1.9s)
+```
+
+The range is not arbitrary — it is what the global `speed` field already spans
+(`much_slower` 0.5 to `much_faster` 1.5). Beyond it the budget stops being a
+request: this model spends whatever time it is given, so a wildly long sentence
+budget comes back as filler rather than as silence. Extra time belongs in
+pauses, where silence is silence.
+
+The prompt gives the director the mapping to reason with:
+
+| feeling | sentence pace | pause length, and how many |
+|---|---|---|
+| panic, urgency, an order | fast and clipped | 0.15–0.3, few — there is no time to stop |
+| anger held in | slower than it wants to be | 0.3–0.5 |
+| grief, melancholy, exhaustion | slow | 0.6–1.0, more than feels right on the page |
+| amusement, a story | uneven — quick setup, slack at the joke | 0.3–0.5, scattered |
+| something hard to say | — | up to 1.5 before the word |
+
+And it asks the same question a director would: what is the body doing. Someone
+out of breath cannot hold a long phrase; someone unsure they want to say this at
+all takes longer to get there than the words need.
+
+**Why this was added.** Listening, the server tended to read whole sentences in
+one go and often quickly. For a horror scene that is right. For a melancholy
+one it is wrong, and asking it explicitly in the chat to slow down and add
+pauses fixed it every time — which means the capability was there and the
+instruction was missing.

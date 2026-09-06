@@ -14,7 +14,8 @@ import asyncio, json, os, struct, threading, time
 
 import numpy as np
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
+from fastapi.responses import (HTMLResponse, JSONResponse, Response,
+                               StreamingResponse)
 
 import config
 import levers
@@ -631,7 +632,16 @@ async def asr(req: Request):
 
 @app.post("/api/turn")
 async def turn(req: Request):
-    body = await req.json()
+    return await _turn(await req.json())
+
+
+async def _turn(body):
+    """The whole acting turn, as a stream of events and PCM.
+
+    Split out of the endpoint so `/api/speak` can drive exactly the same
+    pipeline instead of a copy of it — a second implementation of this would
+    drift from the first within a week.
+    """
     message = (body.get("message") or "").strip()
     history = body.get("history") or []
     language = body.get("language") or "English"
@@ -1609,3 +1619,119 @@ async def turn(req: Request):
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=config.APP_PORT)
+
+
+def _to_mp3(pcm_i16: bytes, sr: int, bitrate="192k") -> bytes:
+    """Little-endian int16 mono to MP3, through ffmpeg.
+
+    ffmpeg is already a dependency of this box and encoding in-process would
+    mean another wheel; this is one pipe and about 40 ms for a fifteen-second
+    take.
+    """
+    import subprocess
+    p = subprocess.run(
+        ["ffmpeg", "-hide_banner", "-loglevel", "error",
+         "-f", "s16le", "-ar", str(sr), "-ac", "1", "-i", "pipe:0",
+         "-codec:a", "libmp3lame", "-b:a", bitrate, "-f", "mp3", "pipe:1"],
+        input=pcm_i16, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    if p.returncode != 0:
+        raise RuntimeError(f"ffmpeg: {p.stderr.decode()[:200]}")
+    return p.stdout
+
+
+@app.post("/api/speak")
+async def speak(req: Request):
+    """Text in, MP3 out — the whole demo behind one request.
+
+    Send what you want said. The language model writes the performance, the
+    reference recording is retrieved, the adapters are chosen, `best_of`
+    candidates are generated and ranked, and the winner comes back as an MP3.
+
+    Everything the web UI can set is optional here and defaults to what the UI
+    ships with, so an empty body beyond `text` gives the demo's own settings.
+    """
+    import base64 as _b64
+    body = await req.json()
+    text = (body.get("text") or body.get("message") or "").strip()
+    if not text:
+        return JSONResponse({"error": "no text"}, status_code=400)
+
+    # the shipped defaults, each overridable by name
+    call = dict(body)
+    call["message"] = text
+    call.pop("text", None)
+    call.setdefault("best_of", config.SPEAK_BEST_OF)
+    call.setdefault("best_of_guidance", config.SPEAK_GUIDANCE)
+    call.setdefault("best_of_audio", False)     # only the winner, unless asked
+    call.setdefault("sidon", config.SIDON_ON)
+    want = str(body.get("format") or "mp3").lower()
+    if want not in ("mp3", "wav", "json"):
+        return JSONResponse({"error": "format must be mp3, wav or json"},
+                            status_code=400)
+
+    t0 = time.time()
+    resp = await _turn(call)
+    if isinstance(resp, JSONResponse):
+        return resp
+    pcm, meta, cands = [], {}, []
+    async for chunk in resp.body_iterator:
+        i = 0
+        while i < len(chunk):
+            kind = chunk[i]
+            n = struct.unpack(">I", chunk[i + 1:i + 5])[0]
+            payload = chunk[i + 5:i + 5 + n]
+            i += 5 + n
+            if kind == 1:
+                pcm.append(payload)
+                continue
+            try:
+                ev = json.loads(payload)
+            except Exception:
+                continue
+            if ev.get("type") == "error":
+                return JSONResponse({"error": ev.get("message")},
+                                    status_code=500)
+            if ev.get("type") == "llm":
+                meta.update({k: ev.get(k) for k in
+                             ("reply", "general", "script", "language", "voice",
+                              "chosen", "brain", "llm_ms", "profile")})
+            elif ev.get("type") == "best_of":
+                meta["best_of"] = ev.get("n")
+                meta["guidance"] = ev.get("guidance")
+                meta["sidon"] = ev.get("sidon")
+                cands = ev.get("candidates") or []
+            elif ev.get("type") == "end":
+                meta.update({k: ev.get(k) for k in
+                             ("audio_sec", "rtf", "loras", "align")})
+    raw = b"".join(pcm)
+    if not raw:
+        return JSONResponse({"error": "no audio produced", "meta": meta},
+                            status_code=500)
+    sr = STATE["tts"].sr
+    meta["total_ms"] = round((time.time() - t0) * 1000, 1)
+    if cands:
+        meta["candidates"] = [{k: c.get(k) for k in
+                               ("rank", "reward", "wer", "genuineness",
+                                "blend", "clap", "sec")} for c in cands]
+
+    if want == "json":
+        return {"sr": sr, "pcm": _b64.b64encode(raw).decode(), **meta}
+    if want == "wav":
+        data = (b"RIFF" + struct.pack("<I", 36 + len(raw)) + b"WAVEfmt " +
+                struct.pack("<IHHIIHH", 16, 1, 1, sr, sr * 2, 2, 16) +
+                b"data" + struct.pack("<I", len(raw)) + raw)
+        media = "audio/wav"
+    else:
+        data = await asyncio.get_running_loop().run_in_executor(
+            None, lambda: _to_mp3(raw, sr, str(body.get("bitrate") or "192k")))
+        media = "audio/mpeg"
+    # the whole performance travels in the headers, so a curl user who only
+    # wanted audio still gets to see what was done to produce it
+    head = {"x-audio-sec": str(meta.get("audio_sec")),
+            "x-language": str(meta.get("language")),
+            "x-best-of": str(meta.get("best_of")),
+            "x-guidance": str(meta.get("guidance")),
+            "x-total-ms": str(meta.get("total_ms")),
+            "x-script": json.dumps(meta.get("script") or "")[:3800],
+            "x-reply": json.dumps(meta.get("reply") or "")[:1800]}
+    return Response(content=data, media_type=media, headers=head)

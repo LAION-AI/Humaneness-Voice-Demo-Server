@@ -20,21 +20,68 @@ Two pages ship in the server:
 
 ---
 
+## Quick start
+
+```bash
+git clone https://github.com/LAION-AI/Humaneness-Voice-Demo-Server
+cd Humaneness-Voice-Demo-Server
+pip install -r requirements.txt
+
+python setup/fetch_all.py            # every model, with a table of what is missing
+python setup/fetch_profile_refs3.py  # the reference recordings
+python setup/build_retrieval_index.py
+
+./run.sh both                        # language model + voice model + web UI
+```
+
+Then open `http://localhost:8792`, or say something without the browser:
+
+```bash
+curl -s localhost:8792/api/speak -H 'content-type: application/json' \
+  -d '{"text": "Tell me the worst thing that happened this week."}' -o reply.mp3
+```
+
+**No API key is needed.** The director runs locally on `gemma-4-12B-it-qat`
+through llama.cpp. A hosted model is an option, not a requirement — see
+[`docs/SERVER.md`](docs/SERVER.md).
+
+Two 24 GB cards is what this is tuned for: the language model on one, the
+speech model on the other. `python setup/fetch_all.py --check` prints what is
+present without downloading anything.
+
+---
+
 ## Where to start
 
 | you want to | read |
 |---|---|
-| use the server without the web page, with or without a language model | [`docs/API.md`](docs/API.md) |
-| know exactly what the director is told, and why | [`docs/PROMPTING.md`](docs/PROMPTING.md) |
-* [`docs/BENCHMARK.md`](docs/BENCHMARK.md) — performing a JSON benchmark item, and the verbatim guarantee
-* [`docs/CONTEXT.md`](docs/CONTEXT.md) — the context window, the 400 it caused, and the guard
-* [`docs/ARENA.md`](docs/ARENA.md) — an evolutionary search for a better director prompt, and why it came back null
-* [`docs/ARENA_PROMPTS.md`](docs/ARENA_PROMPTS.md) — every prompt used in that search, verbatim
-* [`docs/SIDON.md`](docs/SIDON.md) — speech restoration: what it improves, and what it leaves exactly as it was
-* [`docs/BABBLE.md`](docs/BABBLE.md) — why a screamed line came back as babble, and the burst-adapter budget that fixes it
-| reproduce this configuration elsewhere | [`docs/API.md`](docs/API.md) §"Reproducing this server elsewhere", then [`docs/DEFAULTS.md`](docs/DEFAULTS.md) |
+| **use the server over HTTP** — every endpoint, every parameter, with curl | [`docs/SERVER.md`](docs/SERVER.md) |
+| know exactly what the director is told, and why | [`docs/PROMPTING.md`](docs/PROMPTING.md), [`docs/SYSTEM_PROMPTS.md`](docs/SYSTEM_PROMPTS.md) |
+| reproduce this configuration elsewhere | [`docs/DEFAULTS.md`](docs/DEFAULTS.md), then `setup/fetch_all.py` |
 | understand how adapters are loaded and weighted | [`docs/ADAPTERS.md`](docs/ADAPTERS.md) |
 | see what was measured, and what turned out to be wrong | [`docs/EXPERIMENTS.md`](docs/EXPERIMENTS.md), [`docs/LEARNINGS.md`](docs/LEARNINGS.md) |
+
+### The rest of the documentation
+
+| page | what it is |
+|---|---|
+| [`docs/SERVER.md`](docs/SERVER.md) | the HTTP surface: `/api/speak`, the streaming turn, and everything under them |
+| [`docs/API.md`](docs/API.md) | the lower-level endpoints in more detail |
+| [`docs/PROMPTING.md`](docs/PROMPTING.md) | the timed-script format the speech model was trained on |
+| [`docs/SYSTEM_PROMPTS.md`](docs/SYSTEM_PROMPTS.md) | the director's prompts, generated from the code so they cannot drift |
+| [`docs/ADAPTERS.md`](docs/ADAPTERS.md) | every adapter set, its weight, and why merging is unsafe on this checkpoint |
+| [`docs/DEFAULTS.md`](docs/DEFAULTS.md) | every shipped setting and what changed it |
+| [`docs/BEST_OF_N.md`](docs/BEST_OF_N.md) | how candidates are generated and ranked |
+| [`docs/ALIGNMENT.md`](docs/ALIGNMENT.md) | end trimming with a forced aligner |
+| [`docs/SIDON.md`](docs/SIDON.md) | speech restoration: what it improves, and what it leaves exactly as it was |
+| [`docs/BABBLE.md`](docs/BABBLE.md) | two ways a line came back unintelligible, and the budgets that fix them |
+| [`docs/CONTEXT.md`](docs/CONTEXT.md) | the context window, the 400 it caused, and the guard |
+| [`docs/BENCHMARK.md`](docs/BENCHMARK.md) | performing a JSON benchmark item, and the verbatim guarantee |
+| [`docs/SKILLS.md`](docs/SKILLS.md) | the measured vocal-burst recipes and where they come from |
+| [`docs/ARENA.md`](docs/ARENA.md) | an evolutionary search for a better director prompt, and why it came back null |
+| [`docs/ARENA_PROMPTS.md`](docs/ARENA_PROMPTS.md) | every prompt used in that search, verbatim |
+| [`docs/EXPERIMENTS.md`](docs/EXPERIMENTS.md), [`docs/LEARNINGS.md`](docs/LEARNINGS.md), [`docs/FIELD_NOTES.md`](docs/FIELD_NOTES.md) | what was measured, what was believed and turned out wrong |
+| [`docs/LEVERS.md`](docs/LEVERS.md), [`docs/TIPS.md`](docs/TIPS.md), [`docs/DIRECTOR.md`](docs/DIRECTOR.md), [`docs/ENSEMBLE.md`](docs/ENSEMBLE.md) | notes from the team that trained the adapters |
 
 ## The models this runs on
 
@@ -49,10 +96,11 @@ Everything below is downloaded from the Hugging Face Hub. Nothing is trained her
 | Quality adapter, rank 64 | [`laion/moss-va-sft3-dpo-lora-p2`](https://huggingface.co/laion/moss-va-sft3-dpo-lora-p2) — supersedes [`…-dpo-lora`](https://huggingface.co/laion/moss-va-sft3-dpo-lora) |
 | Voice-identity adapters, 500 × rank 16 | [`laion/moss-va-sft3-voice-loras`](https://huggingface.co/laion/moss-va-sft3-voice-loras) |
 | Emotion adapters, 40 × rank 16 | [`laion/moss-va-sft3-emotion-loras`](https://huggingface.co/laion/moss-va-sft3-emotion-loras) |
-| Perceptual-quality adapters, 3 × rank 16 | local SFT3-native set (genuineness, vocal-burst blend, aesthetics) |
-| Delivery-axis adapters, 17 × rank 16 | local SFT3-native set — replaces the 57-dimension VoiceNet adapters below |
-| Vocal-burst adapters, 71 × rank 16 | local SFT3-native set — replaces the v2-era [`laion/vocal-burst-lora-adapters`](https://huggingface.co/laion/vocal-burst-lora-adapters) |
+| Perceptual-quality adapters, 3 × rank 16 | [`laion/moss-va-sft3-quality-lora-adapters`](https://huggingface.co/laion/moss-va-sft3-quality-lora-adapters) — genuineness, vocal-burst blend, aesthetics |
+| Delivery-axis adapters, 17 × rank 16 | [`laion/moss-va-sft3-voicenet-lora-adapters`](https://huggingface.co/laion/moss-va-sft3-voicenet-lora-adapters) — replaces the 57-dimension set below |
+| Vocal-burst adapters, 71 × rank 16 | [`laion/moss-va-sft3-vocal-burst-lora-adapters`](https://huggingface.co/laion/moss-va-sft3-vocal-burst-lora-adapters), and the 105-adapter [`…-v2`](https://huggingface.co/laion/moss-va-sft3-vocal-burst-lora-adapters-v2) release |
 | Voice-quality adapters (57 dimensions) — **parked**, trained against v2 | [`laion/moss-voicenet-dimension-loras`](https://huggingface.co/laion/moss-voicenet-dimension-loras) |
+| Preference adapters (quality DPO, burst+stop DPO) | [`laion/moss-va-sft3-quality-dpo-lora`](https://huggingface.co/laion/moss-va-sft3-quality-dpo-lora), [`laion/moss-va-sft3-burst-stop-dpo-lora`](https://huggingface.co/laion/moss-va-sft3-burst-stop-dpo-lora) |
 | Character adapters | [`TTS-AGI/moss-character-loras-refined-public`](https://huggingface.co/TTS-AGI/moss-character-loras-refined-public) |
 | Base checkpoint the older adapters were trained on | [`laion/moss-tts-local-transformer-4.55b-voice-acting-v2`](https://huggingface.co/laion/moss-tts-local-transformer-4.55b-voice-acting-v2) |
 
@@ -74,13 +122,16 @@ Everything below is downloaded from the Hugging Face Hub. Nothing is trained her
 | Voice-quality predictors (57 dimensions) | [`laion/voicenet-dimension-predictors-commercial`](https://huggingface.co/laion/voicenet-dimension-predictors-commercial) |
 | Speech recognition | [`nvidia/parakeet-tdt-0.6b-v3`](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3) |
 | Speaker-similarity check | [`speechbrain/spkrec-ecapa-voxceleb`](https://huggingface.co/speechbrain/spkrec-ecapa-voxceleb) |
+| Forced aligner for end-trimming (Apache-2.0) | [`Qwen/Qwen3-ForcedAligner-0.6B-hf`](https://huggingface.co/Qwen/Qwen3-ForcedAligner-0.6B-hf) |
+| Speech restoration, optional and off by default | [`sarulab-speech/sidon-v0.1`](https://huggingface.co/sarulab-speech/sidon-v0.1) (MIT) |
 
 ### The language model that writes and directs
 
-Hosted by default (`gpt-5.6-luna`), switchable in the UI to `gemini-3-flash` or
-`gemini-3.5-flash-lite`. A fully local option runs
-[`unsloth/gemma-4-12B-it-qat-GGUF`](https://huggingface.co/unsloth/gemma-4-12B-it-qat-GGUF)
-through `llama.cpp`, which is what `./run.sh llm` starts.
+**Local by default.** [`unsloth/gemma-4-12B-it-qat-GGUF`](https://huggingface.co/unsloth/gemma-4-12B-it-qat-GGUF)
+runs through `llama.cpp`, which is what `./run.sh llm` starts, and nothing
+leaves the machine. Hosted models — `gpt-5.6-luna`, `gemini-3-flash`,
+`gemini-3.5-flash-lite` — are reachable by name when a key is present and are
+never used otherwise.
 
 > The hosted route needs an API key. It is read from `$HYPRLAB_API_KEY` or a file
 > path given by `$MOSS_LUNA_KEY_FILE`. **No key is stored in this repository**,
@@ -461,9 +512,15 @@ occupy 8.8 MB.
 | `asr_engine.py`, `sim_engine.py`, `vc_engine.py`, `sidon_restore.py` | speech recognition, speaker similarity, optional voice conversion and restoration |
 | `index.html`, `studio.html`, `report.html` | the three pages |
 | `levers.py` | which of the three generation levers this turn gets, and why |
+| `bestofn.py` | generating N candidates and ranking them — the reward and its parts |
+| `align_engine.py` | forced alignment and end-trimming ([`ALIGNMENT.md`](docs/ALIGNMENT.md)) |
+| `benchmark.py` | performing a JSON benchmark item verbatim ([`BENCHMARK.md`](docs/BENCHMARK.md)) |
+| `cues.py` | rewriting German stage directions into English before retrieval ([`BABBLE.md`](docs/BABBLE.md)) |
+| `skills.py` | the measured vocal-burst recipes ([`SKILLS.md`](docs/SKILLS.md)) |
+| `sidon.py`, `sidon_server.py` | speech restoration, as a client and its own service ([`SIDON.md`](docs/SIDON.md)) |
 | `steer_engine.py` | the steering vectors and their injection points |
-| `setup/` | corpus extraction, retrieval index, profile traits, the steering pack, `check_levers.py` |
-| `eval/` | consistency and completeness checks |
+| `setup/` | `fetch_all.py` (every model, with a `--check` table), corpus extraction, retrieval index, profile traits, `check_levers.py` |
+| `eval/` | the measurement harnesses behind the docs: `why_babble.py`, `sweetspot.py`, `bsdpo.py`, `cfg_ab.py`, `sidon_test.py`, `harness.py`/`harness2.py` (the arena), plus consistency and completeness checks |
 | `wikiskills/` | the conditioning recipes this server's prompts are built from — one pattern page per emotion, VoiceNet dimension and vocal burst, plus `coefficients.json`, which `config.py` reads via `WIKI_COEFFICIENTS` |
 | `wikiskills_legacy/` | the same tree as it stood before the 2026-09-04 vocal-burst revision, kept so an older result can be traced to the table that produced it |
 | `docs/` | [`ADAPTERS.md`](docs/ADAPTERS.md) (the adapter protocol), [`LEVERS.md`](docs/LEVERS.md) (the generation modes), generated defaults, verbatim system prompts, measurement log |

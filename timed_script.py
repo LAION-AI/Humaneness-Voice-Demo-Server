@@ -61,7 +61,7 @@ _BURST_RE = re.compile(r"\(([^)]*?),\s*([0-9]*\.?[0-9]+)\s*(?:s|sec|seconds?)\)"
                        re.I)
 _PAUSE_RE = re.compile(r"\[\s*(?:([0-9]*\.?[0-9]+)\s*(?:s|sec|seconds?)?\s*)?"
                        r"(?:pause|beat)\s*\]", re.I)
-_DUR_RE = re.compile(r"\[\s*[0-9]*\.?[0-9]+\s*(?:s|sec|seconds?)?\s*duration\s*\]", re.I)
+_DUR_RE = re.compile(r"\[\s*([0-9]*\.?[0-9]+)\s*(?:s|sec|seconds?)?\s*duration\s*\]", re.I)
 _CUE_RE = re.compile(r"\(([^)]*)\)")
 
 
@@ -159,9 +159,19 @@ def parse(script):
     Returns a list of ('pause', secs) | ('burst', label, secs) |
     ('direction', text) | ('speech', text).
     """
-    s = _DUR_RE.sub(" ", str(script or ""))
+    # A duration the DIRECTOR wrote is kept, not stripped.  It used to be
+    # deleted here and recomputed from the word count, so a director asked to
+    # slow a melancholy line down was writing into a field the server threw
+    # away.  `render` clamps it; see `_seconds_for`.
+    s = str(script or "")
     items, pos = [], 0
     marks = []
+    for m in _DUR_RE.finditer(s):
+        try:
+            marks.append((m.start(), m.end(),
+                          ("duration", float(m.group(1)))))
+        except (TypeError, ValueError):
+            marks.append((m.start(), m.end(), ("direction", "")))
     for m in _PAUSE_RE.finditer(s):
         marks.append((m.start(), m.end(), ("pause", float(m.group(1) or PAUSE_DEFAULT))))
     for m in _BURST_RE.finditer(s):
@@ -204,7 +214,11 @@ def render(script, speed=1.0, budget_frames=None):
     items = parse(script)
     seq = []          # (kind, payload, seconds)
     pending_dir = None
+    want_secs = None          # a duration the director asked for
     for it in items:
+        if it[0] == "duration":
+            want_secs = it[1]
+            continue
         if it[0] == "pause":
             seq.append(("pause", None, max(it[1], PAUSE_MIN)))
         elif it[0] == "burst":
@@ -220,6 +234,21 @@ def render(script, speed=1.0, budget_frames=None):
                 if not words:
                     continue
                 secs = _seconds_for(words, speed)
+                if want_secs is not None:
+                    # Honour it, but inside the range the global speed setting
+                    # already spans: `much_slower` is 0.5 and `much_faster` 1.5,
+                    # so 0.6x to 2.0x of natural is territory the model has
+                    # been driven through before.  Beyond that the duration
+                    # budget stops being a request and becomes filler — this
+                    # model spends the time it is given.
+                    lo, hi = secs * 0.6, secs * 2.0
+                    got = min(max(want_secs, lo), hi)
+                    if abs(got - want_secs) > 0.05:
+                        print(f"[timed] asked for {want_secs:.1f}s on "
+                              f"{words} words, using {got:.1f}s "
+                              f"(natural {secs:.1f}s)", flush=True)
+                    secs = round(got, 1)
+                    want_secs = None
                 if pending_dir:
                     seq.append(("direction", pending_dir, 0.0))
                     pending_dir = None
