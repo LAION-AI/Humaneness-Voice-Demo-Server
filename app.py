@@ -1309,8 +1309,18 @@ async def _turn(body):
         want_sidon = body.get("sidon", config.SIDON_ON) is not False
         if want_sidon and not sidon.up():
             want_sidon = False
-        if (bon_n > 1 or want_sidon) and STATE.get("judge") is not None \
-                and config.TIMED_SCRIPT:
+        # Guidance cannot stream either, so a single take that asks for it has
+        # to take this path too.  Without this, `best_of: 1` with
+        # `best_of_guidance: 3.0` streamed unguided and reported nothing — the
+        # setting was accepted and silently ignored.
+        try:
+            _gv_req = float(body.get("best_of_guidance")
+                            if body.get("best_of_guidance") is not None
+                            else (config.BON_GUIDANCE if bon_n > 1 else 1.0))
+        except (TypeError, ValueError):
+            _gv_req = 1.0
+        if (bon_n > 1 or want_sidon or _gv_req > 1.0001) \
+                and STATE.get("judge") is not None and config.TIMED_SCRIPT:
             try:
                 _tg, _fr, _pl = timed_script.render(out["script"], speed=speed)
                 lc = "DE" if str(spoken).lower().startswith(("ger", "de")) else "EN"
@@ -1320,12 +1330,10 @@ async def _turn(body):
                 item = {"text": _tg, "tokens": _fr, "language": spoken,
                         "instruction": f"GENERAL: {_gl}\nSCRIPT:\n{_tg}",
                         "ref_codes": ref_codes}
-                gv = body.get("best_of_guidance")
-                # Guidance is a best-of-N setting, not a restoration one: a
-                # plain turn that is only here to be restored must not silently
-                # acquire a 1.93x cost it never asked for.
-                gv = ((config.BON_GUIDANCE if bon_n > 1 else 1.0)
-                      if gv is None else float(gv))
+                # Guidance is not a restoration setting: a plain turn that is
+                # only here to be restored must not silently acquire a 1.93x
+                # cost it never asked for.  `_gv_req` carries what was asked.
+                gv = _gv_req
                 if gv > 1.0001 and out.get("general_unc"):
                     _gu = timed_script.general_line(
                         out["general_unc"], _fr / config.FRAME_RATE, lc, None)

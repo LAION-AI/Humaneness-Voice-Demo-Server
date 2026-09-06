@@ -165,7 +165,19 @@ curl -s $MOSS_HOST/api/speak -H 'content-type: application/json' -d '{
 }' -o other.mp3
 ```
 
-## 8. Faster, when you do not need ten takes
+## 8. One take, still guided
+
+Guidance applies at any `best_of`, including one. This is the cheapest request
+that still gets the setting the measurements favour — about 20 seconds:
+
+```bash
+curl -s $MOSS_HOST/api/speak -H 'content-type: application/json' -d '{
+  "text": "Today we can stay on this train until the sea appears.",
+  "best_of": 1, "best_of_guidance": 3.0, "bitrate": "128k"
+}' -o one.mp3
+```
+
+## 9. Faster still, when you do not need the guidance
 
 ```bash
 curl -s $MOSS_HOST/api/speak -H 'content-type: application/json' -d '{
@@ -174,8 +186,15 @@ curl -s $MOSS_HOST/api/speak -H 'content-type: application/json' -d '{
 }' -o quick.mp3
 ```
 
-One candidate, no guidance: a few seconds instead of a minute, and measurably
-worse. Use it for iterating on wording, not for the final take.
+One candidate, no guidance: a few seconds instead of twenty, and measurably
+worse — guidance is worth about two points of fifteen. Use it for iterating on
+wording, not for the final take.
+
+| request | guidance | wall clock |
+|---|--:|--:|
+| `best_of: 1, best_of_guidance: 1.0` | off | ~6 s |
+| `best_of: 1` (guidance 3.0 by default) | 3.0 | ~23 s |
+| default (`best_of: 10`) | 3.0 | ~55 s |
 
 ---
 
