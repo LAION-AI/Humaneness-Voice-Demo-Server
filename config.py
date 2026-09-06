@@ -595,7 +595,22 @@ BURST_LAM_INTENSE = float(os.environ.get("MOSS_BURST_LAM_INTENSE", "0.5"))
 # adapter and often a delivery axis.  The study saw the same edge from its own
 # side -- nine of 400 ladder cells produced no decodable audio, all at w >= 2.3.
 # Raise it with MOSS_BURST_LAM_MAX or the slider to hear the recipe weights.
-BURST_LAM_MAX = float(os.environ.get("MOSS_BURST_LAM_MAX", "1.5"))
+# Measured 6 September 2026 on a fixed scream script under the full shipped
+# stack, six seeds per cell, word error against the intended line:
+#
+#   sum 1.0 (2 x 0.5)   median 0.000   0/6 broken
+#   sum 1.5 (3 x 0.5)   median 0.000   0/6
+#   sum 2.0 (2 x 1.0)   median 0.010   0/6
+#   sum 2.0 (3 x 0.67)  median 0.000   0/6
+#   sum 2.5 (2 x 1.25)  median 0.110   0/6, mean 0.103 -- degrading
+#   sum 3.0 (2 x 1.5)   median 0.820   5/5 broken, unusable
+#
+# So it is the SUM that breaks a line, not the single weight: one adapter at
+# 1.5 was clean in 5 of 5, two at 1.5 failed in 5 of 5.  That is the opposite
+# of what the single-adapter ladder concluded on a bare model, and the
+# difference is the rest of the stack -- a delivery axis at 1.5 and a
+# preference adapter at 1.5 are already merged before a burst arrives.
+BURST_LAM_MAX = float(os.environ.get("MOSS_BURST_LAM_MAX", "1.25"))
 
 # ---------------------------------------------------------------- generation modes
 # THE THREE LEVERS.  Until now this server had exactly one way to shape a performance:
@@ -860,7 +875,11 @@ BURST_MAX_ADAPTERS = int(os.environ.get("MOSS_BURST_MAX_ADAPTERS", "3"))
 # adapter that breaks a line, not the sum, so this only bounds the merge cost.
 # An earlier budget of 1.0 here was set from turn-to-turn comparisons that were
 # dominated by the director writing different scripts, and was wrong.
-BURST_LAM_BUDGET = float(os.environ.get("MOSS_BURST_LAM_BUDGET", "3.0"))
+# The cliff sits between 2.5 and 3.0; 2.0 is the last value clean on every
+# arrangement tried.  Over budget the weights are SCALED, never dropped: a
+# scream that is quietly not merged is a worse outcome than a scream at two
+# thirds weight, and dropping made the set depend on tag order.
+BURST_LAM_BUDGET = float(os.environ.get("MOSS_BURST_LAM_BUDGET", "2.0"))
 
 # ---------------------------------------------------------------- best-of-N
 # Generate the turn several times and keep the best.  The burst recipes quote an
@@ -873,7 +892,7 @@ BON_N = int(os.environ.get("MOSS_BON_N", "8"))
 # study measured -- anchor separation rises monotonically to it with no reversal
 # anywhere in the grid -- and it is what a listener reported as the top of the
 # usable range.  Its cost over 3.0 is not separable on the data we have.
-BON_GUIDANCE = float(os.environ.get("MOSS_BON_GUIDANCE", "4.0"))
+BON_GUIDANCE = float(os.environ.get("MOSS_BON_GUIDANCE", "3.0"))
 # How much the "is this the performance that was asked for" term counts.  Double,
 # because the other two terms measure whether a take is good at all rather than
 # whether it is the right one.
@@ -906,12 +925,20 @@ BREATHE_MAX = int(os.environ.get("MOSS_BREATHE_MAX", "2"))
 # 5 on "how pleasant does this sound" (p < 0.001, 21 paired clips) with no
 # movement on how natural or how fitting the performance is: it cleans the
 # signal, not the delivery.  See docs/SIDON.md.
+#
+# DEFAULT OFF since 6 September 2026.  It was shipped on and turned back off
+# after a listening report: on screams and loud vocal bursts it distorts.  The
+# measurement that put it on used twenty-one clips drawn across the score range
+# of an ordinary conversational run, and that sample contained no screaming --
+# so the +0.43 is real for ordinary speech and says nothing about the loud tail,
+# which is exactly where a restoration model trained on clean read speech has
+# least support.  Still worth turning on by hand for a quiet take.
 # This is the TorchScript pair served from the hub snapshot, which is a
 # different path from SIDON_SRC above — that one is the research checkout used
 # once, offline, to restore the corpus anchor.
 # The app sees the TTS card as cuda:0 and the language model's as cuda:1;
 # restoration goes on the second so it never competes with generation.
-SIDON_ON = os.environ.get("MOSS_SIDON", "1") not in ("0", "false", "no")
+SIDON_ON = os.environ.get("MOSS_SIDON", "0") not in ("0", "false", "no")
 SIDON_DEVICE = os.environ.get("MOSS_SIDON_DEVICE", "cuda:0")
 SIDON_SNAPSHOT = os.environ.get(
     "MOSS_SIDON_SNAPSHOT",

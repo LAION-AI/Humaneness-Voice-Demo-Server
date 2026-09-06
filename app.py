@@ -1019,14 +1019,34 @@ async def turn(req: Request):
                                 tagged.append(lab)
                     tagged = tagged[:config.BURST_MAX_ADAPTERS]
                     specs = [(n, l) for n, l in specs if not n.startswith("burst")]
-                    _spent = 0.0
+                    # Fit the whole set inside the budget by SCALING, not by
+                    # dropping.  Bursts carry the drama of a line — a scream that
+                    # is quietly not merged is a worse outcome than a scream at
+                    # two thirds weight — and dropping also silently changed
+                    # which classes a reply could use depending on their order.
+                    # Measured: two adapters at 1.5 each destroyed the line in
+                    # 5 of 5 seeds (median word error 0.82); the same script with
+                    # one at 1.5, or two at 0.5, came back clean every time.  It
+                    # is the SUM that breaks a line here, which is the opposite
+                    # of what the single-adapter ladder found on a bare model.
+                    _want = []
                     for lab in tagged:
+                        _want.append((lab, _burst_lam(f"burst:{lab}",
+                                                      config.BURST_LAM)))
+                    _sum = sum(w for _, w in _want)
+                    _scale = 1.0
+                    if _sum > config.BURST_LAM_BUDGET and _sum > 0:
+                        _scale = config.BURST_LAM_BUDGET / _sum
+                        print(f"[skills] burst budget {config.BURST_LAM_BUDGET:g}: "
+                              f"{len(_want)} adapters want {_sum:g}, scaling by "
+                              f"{_scale:.2f}", flush=True)
+                    _spent = 0.0
+                    for lab, _w0 in _want:
                         cand = _reroot(f"burst:{lab}")
-                        _w = _burst_lam(f"burst:{lab}", config.BURST_LAM)
-                        if _spent + _w > config.BURST_LAM_BUDGET and _spent > 0:
-                            print(f"[skills] burst budget spent, {lab} not merged "
-                                  f"({_spent:g} + {_w:g} > "
-                                  f"{config.BURST_LAM_BUDGET:g})", flush=True)
+                        _w = round(_w0 * _scale, 3)
+                        if _w < 0.05:
+                            print(f"[skills] {lab} scaled below audibility "
+                                  f"({_w:g}), not merged", flush=True)
                             continue
                         if cand in lb.repos:
                             _spent += _w
@@ -1268,6 +1288,38 @@ async def turn(req: Request):
                 if want_sidon:
                     waves, sidon_used = await loop.run_in_executor(
                         None, lambda: sidon.enhance_many(raw_waves, tts.sr))
+                # Trim EVERY candidate, not only the one that gets played.
+                # The players in the UI were showing untrimmed audio while the
+                # stream carried a trimmed take — a reply whose player said
+                # 18.4 s next to a stream of 16.5 s, which reads as "end
+                # trimming is not working" when it is working and the listener
+                # is simply hearing the wrong copy.  Trimming before the judge
+                # also means the reward ranks what will actually be heard.
+                bon_aligns = [None] * len(waves)
+                if STATE.get("aligner") is not None \
+                        and body.get("align", config.ALIGN_ON) is not False:
+                    def _trim_all(ws, raws):
+                        outs, raws2, reps = [], [], []
+                        for k, w in enumerate(ws):
+                            try:
+                                t, r = align_engine.trim(w, tts.sr, _tg, _pl,
+                                                         STATE["aligner"])
+                            except Exception as e:
+                                print(f"[align] candidate {k} skipped: {e}",
+                                      flush=True)
+                                t, r = w, None
+                            outs.append(t)
+                            reps.append(r)
+                            # cut the original at the same point: restoration
+                            # preserves length to about 20 ms, so the same
+                            # sample index is the same moment, and the two
+                            # players should not differ in length for a reason
+                            # that has nothing to do with restoration
+                            rw = raws[k] if k < len(raws) else None
+                            raws2.append(rw if rw is None else rw[:len(t)])
+                        return outs, raws2, reps
+                    waves, raw_waves, bon_aligns = await loop.run_in_executor(
+                        None, lambda: _trim_all(waves, raw_waves))
                 cands = STATE["judge"].score(waves, tts.sr, _pl,
                                              general=out["general"],
                                              script=out["script"])
@@ -1301,6 +1353,8 @@ async def turn(req: Request):
                                         -32768, 32767).astype("<i2").tobytes()
                         bon["candidates"][i]["pcm"] = _b64.b64encode(pcm16).decode()
                         bon["candidates"][i]["index"] = i
+                        bon["candidates"][i]["align"] = bon_aligns[i] \
+                            if i < len(bon_aligns) else None
                         if sidon_used and i < len(raw_waves) \
                                 and raw_waves[i] is not None:
                             r16 = np.clip(np.asarray(raw_waves[i], np.float32)
@@ -1325,14 +1379,11 @@ async def turn(req: Request):
         if bon is not None and bon.get("wave") is not None \
                 and len(bon["wave"]):
             w = np.asarray(bon["wave"], np.float32)
-            if guard is not None:
-                try:
-                    _tg2, _fr2, _pl2 = timed_script.render(out["script"], speed=speed)
-                    w, arep = align_engine.trim(w, tts.sr, _tg2, _pl2,
-                                                STATE["aligner"])
-                    bon["align"] = arep
-                except Exception as e:
-                    print(f"[align] best-of trim skipped: {e}", flush=True)
+            # already trimmed above, with every other candidate; trimming a
+            # second time would only re-run the aligner on its own output
+            bon["align"] = (bon.get("candidates") or [{}])[
+                bon.get("chosen", 0)].get("align") \
+                if bon.get("candidates") else None
             payload = {k: v for k, v in bon.items() if k != "wave"}
             payload["sr"] = tts.sr
             yield _ev({"type": "best_of", **payload})

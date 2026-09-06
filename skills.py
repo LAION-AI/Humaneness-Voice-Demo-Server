@@ -292,8 +292,18 @@ class Skills:
         # direction mentioning a scream sat two words from the director's own
         # `(scream)`, and both became bursts.
         import re as _re0
-        already = {m.group(1).strip().lower().replace(" ", "_")
-                   for m in _re0.finditer(r"\(([^),0-9]+)\)", str(script or ""))}
+        # This has to see a burst however it is written.  It used to match only
+        # brackets with no comma and no digit, which caught "(scream)" and
+        # missed "(scream, 0.7 seconds)" -- and the prompt now asks the director
+        # for exactly the second form.  So from the day the length was
+        # introduced, a director who wrote "(scream, 0.7 seconds)" and then
+        # mentioned the scream in the next direction got a SECOND bare
+        # "(scream)" inserted, and the line opened on two screams.
+        already = set()
+        for _m in _re0.finditer(r"\(([^)]*)\)", str(script or "")):
+            _lab = _re0.split(r",\s*[0-9]", _m.group(1))[0].strip().lower()
+            if _lab and not _re0.search(r"[0-9]", _lab):
+                already.add(_lab.replace(" ", "_"))
         # longest first, so "fearful gasp" wins over "gasp"
         labels = sorted(offer, key=len, reverse=True)
         out, added, pos = [], [], 0

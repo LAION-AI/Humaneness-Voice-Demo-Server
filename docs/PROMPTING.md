@@ -491,3 +491,20 @@ HOW TO WRITE THEM — each of these was measured on this model:
   * Do not substitute a neighbour. Asking for a tired groan to get a frustrated one is measured as a harm, not a fallback.
   * Never open or close the line on a burst; words must follow.
 ```
+
+## The standing GENERAL block is fixed, not written
+
+Every `GENERAL:` line on every path now ends with this, verbatim:
+
+> the same speaker continues without interruption: identical voice, identical
+> person, same microphone and same room. genuine and spontaneous, like a real
+> person in a real moment, not acted. pristine high-quality studio recording, no
+> background noise.
+
+`timed_script.STANDING` holds it and `general_line()` appends it after dropping
+whatever the director wrote in its place, so it cannot drift between turns.
+This reverts an earlier compression to short equivalents (*"same speaker
+throughout"*, *"genuine, not acted"*), which was done to keep the line close to
+the guide's one-line example. These exact words are what the training corpus was
+captioned with, and a paraphrase of a caption is a different conditioning signal
+from the caption.

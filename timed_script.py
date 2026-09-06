@@ -280,6 +280,15 @@ def check(tagged, frames):
     return round(tot, 2), frames, abs(tot * config.FRAME_RATE - frames) <= 1.0
 
 
+# Carried verbatim at the end of every GENERAL, on every turn and every path.
+# These are the words the training corpus was captioned with; a paraphrase is a
+# different conditioning signal, so this block is fixed rather than written.
+STANDING = ("the same speaker continues without interruption: identical voice, "
+            "identical person, same microphone and same room. genuine and "
+            "spontaneous, like a real person in a real moment, not acted. "
+            "pristine high-quality studio recording, no background noise.")
+
+
 def general_line(general, seconds, lang_code, reads_as=None):
     """Fold GENERAL into the one-line shape the format's own example uses.
 
@@ -290,21 +299,25 @@ def general_line(general, seconds, lang_code, reads_as=None):
     through before it reaches the part that changes between turns.
     """
     g = " ".join(str(general or "").split())
-    # The standing sentences this demo had accumulated — register, continuity,
-    # genuineness, room — are four clauses of prose that never change between
-    # turns.  The format's own example is one line, so they are compressed to
-    # the short equivalents rather than carried in full.
+    # The standing sentences — continuity, genuineness, room — are carried in
+    # FULL and identically on every turn.  They were compressed to short
+    # equivalents ("same speaker throughout", "genuine, not acted") to keep the
+    # line close to the guide's one-line example, and that compression is now
+    # reverted deliberately: these exact words are what the corpus was captioned
+    # with, and a paraphrase of a caption is a different conditioning signal
+    # from the caption.  Whatever the director wrote in their place is dropped
+    # and replaced, so the block cannot drift turn to turn.
     keep_short = []
     for sent in re.split(r"(?<=[.;])\s+", g):
         low = sent.lower()
-        if "the way someone actually talks" in low or "close conversational volume" in low:
+        if ("the way someone actually talks" in low
+                or "close conversational volume" in low):
             keep_short.append("close conversational volume, unforced")
-        elif "the same speaker continues" in low:
-            keep_short.append("same speaker throughout")
-        elif "genuine and spontaneous" in low:
-            keep_short.append("genuine, not acted")
-        elif "studio recording" in low:
-            keep_short.append("clean studio recording")
+        elif ("the same speaker continues" in low
+                or "genuine and spontaneous" in low
+                or "studio recording" in low
+                or "background noise" in low):
+            continue                      # replaced verbatim below
         elif sent.strip(" .;"):
             keep_short.append(sent.strip(" .;"))
     seen, g2 = set(), []
@@ -317,7 +330,9 @@ def general_line(general, seconds, lang_code, reads_as=None):
         names = reads_as if isinstance(reads_as, str) else ", ".join(reads_as)
         names = names.replace("_", " ").lower()
         g += f"; reads as {names}"
-    return f"{g}; {seconds:.1f}s, {lang_code}."
+    g = g.strip(" ;.,")            # an empty GENERAL left a leading "; "
+    return (f"{g}. {STANDING} {seconds:.1f}s, {lang_code}." if g
+            else f"{STANDING} {seconds:.1f}s, {lang_code}.")
 
 
 def neutralise(tagged):

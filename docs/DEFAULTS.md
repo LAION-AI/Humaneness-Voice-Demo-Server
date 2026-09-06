@@ -205,3 +205,14 @@ environment variable too, so nothing here needs a code edit to change.
 On means no streaming: the take is generated whole, restored, then sent. Start
 the service with `./run.sh sidon`; without it the server keeps working and
 returns the takes unrestored. See `docs/SIDON.md`.
+
+## Changed 6 September 2026
+
+| setting | was | now | why |
+|---|--:|--:|---|
+| `BURST_LAM_BUDGET` | 3.0 | **2.0** | 2 × 1.5 broke the line in 5 of 5 seeds; see `docs/BABBLE.md` |
+| `BURST_LAM_MAX` | 1.5 | **1.25** | single-adapter ceiling under the new budget |
+| `BON_GUIDANCE` | 4.0 | **3.0** | |
+| `SIDON_ON` | on | **off** | distorts on screams and loud bursts; the +0.43 measurement contained no screaming |
+
+Over budget, burst weights are now **scaled** rather than dropped.
