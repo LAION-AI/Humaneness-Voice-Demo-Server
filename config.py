@@ -945,3 +945,10 @@ SIDON_SNAPSHOT = os.environ.get(
     "/mnt/nvme/hf_cache/hub/models--sarulab-speech--sidon-v0.1/snapshots/*")
 SIDON_BASE = os.environ.get("MOSS_SIDON_BASE", "http://127.0.0.1:8793")
 SIDON_TIMEOUT = float(os.environ.get("MOSS_SIDON_TIMEOUT", "120"))
+
+# Every bracket in English, whatever language is being spoken.  Measured on one
+# German line, four seeds a cell: German cues median word error 0.267 (2 of 4
+# unusable) against 0.000 with the same German words and English cues.  The
+# prompt has asked for this all along and the director does not comply on German
+# turns, so the server rewrites them before the reference is retrieved.
+ENGLISH_CUES = os.environ.get("MOSS_ENGLISH_CUES", "1") not in ("0", "false")

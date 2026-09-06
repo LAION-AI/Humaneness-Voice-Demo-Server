@@ -130,3 +130,71 @@ Word error **1.82 → 0.00**.
 
 Reproduce with `eval/why_babble.py` (isolation), `eval/sweetspot.py` (the dose
 table) and `eval/bsdpo.py` (the interaction).
+
+---
+
+# The German turn, which babbled for a different reason
+
+The same item performed in German came back as babble again, and the burst
+budget was not the cause this time. Four seeds a cell, word error against the
+intended German text:
+
+| condition | median WER | unusable |
+|---|--:|--:|
+| German cues + German GENERAL | 0.267 | 2/4 |
+| German cues + English GENERAL | 0.389 | 3/4 |
+| English cues + German GENERAL | 0.033 | 0/4 |
+| **English cues + English GENERAL** | **0.000** | 0/4 |
+| English/English + `reads as jealousy and envy` | 0.044 | 0/4 |
+| English/English + the wrong emotion adapter | 0.067 | 0/4 |
+| English/English + the right one (`Fear`) | 0.011 | 0/4 |
+
+**It is the brackets.** Translating only the cues — leaving every German word of
+the line untouched — took it from babble to clean. The corpus is captioned in
+English; its German lines read *"Das zerreisst einen einfach, weisst du?
+(relief sigh)"*. A German cue is outside the distribution the voice model
+learned and it takes the words down with it.
+
+The wrong emotion adapter, which looked like the obvious culprit —
+`Jealousy_and_Envy` conditioning a horror scene — costs 0.067 against 0.011.
+Real, and an order of magnitude smaller than the cues.
+
+## The fix, since the prompt does not hold
+
+The rule *"EVERY BRACKET IS WRITTEN IN ENGLISH"* has been in the system prompt
+since the corpus was described, and the director writes German cues on German
+turns anyway. So `cues.py` rewrites them server-side, **before retrieval** —
+which matters, because the retriever falls back to the director's named emotion
+whenever the cues are German, and that fallback is how a horror scene ended up
+conditioned on `Jealousy_and_Envy` in the first place. English cues let the
+retriever read the cues it was built to read.
+
+The language model does the rewriting, not a lexicon. A lexicon over the
+prescribed vocabulary was tried first and produced half-translated cues —
+`(clearly amused, frei heraus, warm and offen)` — which is worse than either
+language alone. It survives only as the offline fallback when no model can be
+reached.
+
+`MOSS_ENGLISH_CUES=0` turns it off. Measured cost: **1.3–3.6 s** on
+`gemini-3.5-flash-lite`. The local 12B took **15.6 s** for the same three
+brackets, which is a third of a turn spent translating, so the hosted model is
+used when a key is present and the local one is the fallback.
+
+## Three smaller faults found on the way
+
+**The budget scaling was being undone.** After scaling, the code re-derived
+every burst weight from the recipe. Adapters whose name tail *is* the class
+(`burst_v2:fearful_gasp`) got their full recipe weight back, while
+`burst_abl:ablation_d2_matched__scream` kept its scaled value because that tail
+is not a class name. The two then summed to 2.42 against a budget of 2.0. It
+now caps only, and a final clamp bounds the total whatever put an adapter in the
+list.
+
+**The UI slider outranked the new ceiling.** `blmax` still defaulted to 1.5 and
+is passed as `burst_lam_max`, which overrides `BURST_LAM_MAX`. Now 1.25.
+
+**A closure could not see `re`.** The translation helper referenced `re` while
+the same handler imports `re` locally further down, which makes the name local
+for the whole function — so the closure raised `name 're' is not defined`, fell
+through to the lexicon, and produced the half-translated cues above. It uses its
+own alias now.

@@ -22,6 +22,7 @@ import lora_bank
 import align_engine
 import bestofn
 import steer_engine
+import cues
 import sidon
 import timed_script
 from llm_agent import VOICE_TOOL, LLMAgent
@@ -685,6 +686,67 @@ async def turn(req: Request):
         if lang2 == "en" and retrieval.looks_german(out.get("reply") or ""):
             lang2 = "de"
             spoken = "German"
+        # Every bracket in English, whatever is being spoken.  The prompt has
+        # asked for this since the corpus was described and the director writes
+        # German cues on German turns anyway; measured, that costs a median word
+        # error of 0.267 against 0.000 with the same words and English cues.
+        # This runs BEFORE retrieval on purpose: the retriever falls back to the
+        # named emotion when the cues are German, which is how a horror scene
+        # ended up conditioned on "Jealousy_and_Envy".
+        if lang2 == "de" and body.get("english_cues", config.ENGLISH_CUES) \
+                is not False:
+            async def _tr(items):
+                msg = ("Rewrite each of these stage directions in English. Keep "
+                       "the meaning and the intensity adverb exactly; keep them "
+                       "the same length or shorter; return only a JSON array of "
+                       "strings, same order, no other text.\n\n"
+                       + json.dumps(items, ensure_ascii=False))
+                # The local 12B took 15.6 s on this, which is a third of the
+                # turn spent translating three brackets.  Use the fastest
+                # hosted model when a key is present and keep the local one as
+                # the fallback, since this must not become a hard dependency.
+                key = config.luna_key()
+                if key:
+                    base, model = config.LUNA_BASE.rstrip("/"), \
+                        config.HOSTED_MODELS.get("gemini-flash-lite",
+                                                 "gemini-3.5-flash-lite")
+                    extra = {"reasoning_effort": "none"}
+                else:
+                    base, model, extra = agent.base, agent.model, {}
+                r = await agent.client.post(
+                    f"{base}/v1/chat/completions",
+                    json={"model": model,
+                          "messages": [{"role": "user", "content": msg}],
+                          "temperature": 0.2,
+                          "response_format": {"type": "json_object"}, **extra},
+                    headers={"Authorization": f"Bearer {key}"} if key else None)
+                r.raise_for_status()
+                # A local `import re` further down this handler makes `re` a
+                # local name for the whole function, so this closure cannot see
+                # the module-level one and raised "name 're' is not defined" —
+                # which silently fell through to the lexicon and produced
+                # half-translated cues like "(clearly amused, frei heraus)".
+                import re as _re_cue
+                txt = r.json()["choices"][0]["message"]["content"] or ""
+                m = _re_cue.search(r"\[.*\]", txt, _re_cue.S)
+                got = json.loads(m.group(0)) if m else \
+                    json.loads(txt).get("directions")
+                return [str(x) for x in (got or [])]
+            try:
+                t_cue = time.time()
+                sc2, n_cue, _orig = await cues.englishise_async(
+                    out.get("script"), _tr, force=True)
+                gen2, n_gen = await cues.englishise_general_async(
+                    out.get("general"), _tr, force=True)
+                if n_cue or n_gen:
+                    out["script"] = sc2
+                    out["general"] = gen2
+                    print(f"[cues] {n_cue} direction(s) and {n_gen} GENERAL "
+                          f"clause(s) rewritten in English in "
+                          f"{(time.time()-t_cue)*1000:.0f} ms", flush=True)
+            except Exception as e:
+                print(f"[cues] left as written: {type(e).__name__}: {e}",
+                      flush=True)
         speed = config.SPEED_WORDS.get(out.get("speed") or "normal", 1.0)
         try:
             pv = prof["id"] if prof else None
@@ -1057,8 +1119,27 @@ async def turn(req: Request):
                             # back to the flat default.
                             specs.append((cand, _w))
 
-                    specs = [((n, _burst_lam(n, l)) if _isb(n)
-                              else (n, l)) for n, l in specs]
+                    # Cap only.  This used to re-run `_burst_lam`, which looks
+                    # the weight up from the recipe again — so it overwrote the
+                    # budget scaling for any adapter whose name tail IS the
+                    # class.  `burst_v2:fearful_gasp` went back to its recipe
+                    # 1.5 while `burst_abl:ablation_d2_matched__scream` kept its
+                    # scaled 0.923, because that tail is not a class name and
+                    # the lookup fell through to the value passed in.  The two
+                    # then summed to 2.42 against a budget of 2.0.
+                    specs = [((n, min(l, _cap)) if _isb(n) else (n, l))
+                             for n, l in specs]
+                    # Last word on the budget, whatever put a burst adapter in
+                    # the list — a slider, an override, a second code path.
+                    _bs = [(n, l) for n, l in specs if _isb(n)]
+                    _tot = sum(l for _, l in _bs)
+                    if _tot > config.BURST_LAM_BUDGET and _tot > 0:
+                        _f = config.BURST_LAM_BUDGET / _tot
+                        print(f"[skills] burst total {_tot:.3g} over budget "
+                              f"{config.BURST_LAM_BUDGET:g}, scaling by {_f:.2f}",
+                              flush=True)
+                        specs = [((n, round(l * _f, 3)) if _isb(n) else (n, l))
+                                 for n, l in specs]
             except Exception as e:
                 print(f"[skills] burst weights unchanged: {e}", flush=True)
 
