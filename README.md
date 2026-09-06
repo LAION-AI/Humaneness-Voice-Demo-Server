@@ -55,6 +55,7 @@ present without downloading anything.
 
 | you want to | read |
 |---|---|
+| **get acted speech out of it with curl** — the cookbook | [`docs/VOICE_ACTING_TASKS.md`](docs/VOICE_ACTING_TASKS.md) |
 | **use the server over HTTP** — every endpoint, every parameter, with curl | [`docs/SERVER.md`](docs/SERVER.md) |
 | know exactly what the director is told, and why | [`docs/PROMPTING.md`](docs/PROMPTING.md), [`docs/SYSTEM_PROMPTS.md`](docs/SYSTEM_PROMPTS.md) |
 | reproduce this configuration elsewhere | [`docs/DEFAULTS.md`](docs/DEFAULTS.md), then `setup/fetch_all.py` |

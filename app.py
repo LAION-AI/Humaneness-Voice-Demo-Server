@@ -1336,9 +1336,11 @@ async def _turn(body):
                     gv = 1.0
                 t_bon = time.time()
 
-                def _gen(items, g):
+                _seed0 = int(body.get("seed") or 1234)
+
+                def _gen(items, g, seed=None):
                     return tts.generate_batch(items, lora_specs=specs,
-                                              seed=int(body.get("seed") or 1234),
+                                              seed=_seed0 if seed is None else seed,
                                               guidance=g, seed_per_item=True)
 
                 def _gen_chunked():
@@ -1359,7 +1361,14 @@ async def _turn(body):
                         try:
                             for off in range(0, bon_n, size):
                                 k = min(size, bon_n - off)
-                                out += _gen([dict(item) for _ in range(k)], gv)
+                                # A different seed per chunk.  `torch.manual_seed`
+                                # is called once per batch, so every chunk of
+                                # identical items started from the same RNG state
+                                # and produced the same takes again: best-of-8 at
+                                # guidance, which chunks 4 + 4, was really
+                                # best-of-4 with each candidate listed twice.
+                                out += _gen([dict(item) for _ in range(k)], gv,
+                                            seed=_seed0 + off)
                         except _t.cuda.OutOfMemoryError:
                             ok = False
                             _t.cuda.empty_cache()
@@ -1662,7 +1671,7 @@ async def speak(req: Request):
     call.pop("text", None)
     call.setdefault("best_of", config.SPEAK_BEST_OF)
     call.setdefault("best_of_guidance", config.SPEAK_GUIDANCE)
-    call.setdefault("best_of_audio", False)     # only the winner, unless asked
+    call["best_of_audio"] = bool(body.get("best_of_audio"))  # only the winner unless asked
     call.setdefault("sidon", config.SIDON_ON)
     want = str(body.get("format") or "mp3").lower()
     if want not in ("mp3", "wav", "json"):
@@ -1713,6 +1722,32 @@ async def speak(req: Request):
         meta["candidates"] = [{k: c.get(k) for k in
                                ("rank", "reward", "wer", "genuineness",
                                 "blend", "clap", "sec")} for c in cands]
+        # With best_of_audio the candidates carry their own audio too, encoded
+        # the same way the winner is.  Without this a caller who wanted to hear
+        # all ten got ten scores and one file, which is the least useful half.
+        if body.get("best_of_audio") and want in ("json", "mp3", "wav"):
+            # json is how a caller asks for ALL the candidates, and they want
+            # files rather than raw samples; `candidate_format` overrides.
+            enc = str(body.get("candidate_format")
+                      or ("mp3" if want == "json" else want)).lower()
+            for i, c in enumerate(cands):
+                raw_c = c.get("pcm")
+                if not raw_c:
+                    continue
+                pcm_c = _b64.b64decode(raw_c)
+                if enc == "mp3":
+                    data_c = await asyncio.get_running_loop().run_in_executor(
+                        None, lambda p=pcm_c: _to_mp3(
+                            p, sr, str(body.get("bitrate") or "192k")))
+                elif enc == "wav":
+                    data_c = (b"RIFF" + struct.pack("<I", 36 + len(pcm_c)) +
+                              b"WAVEfmt " +
+                              struct.pack("<IHHIIHH", 16, 1, 1, sr, sr * 2, 2, 16)
+                              + b"data" + struct.pack("<I", len(pcm_c)) + pcm_c)
+                else:
+                    data_c = pcm_c
+                meta["candidates"][i]["audio"] = _b64.b64encode(data_c).decode()
+                meta["candidates"][i]["audio_format"] = enc
 
     if want == "json":
         return {"sr": sr, "pcm": _b64.b64encode(raw).decode(), **meta}
