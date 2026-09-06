@@ -368,7 +368,10 @@ its cues removed, so "script" must contain the complete line, exactly as you wan
          "I just [0.4 seconds pause] I do not know what to say."
          "It was, [0.3 seconds pause] honestly, the best week of my life."
          "Ich wollte dir [0.5 seconds pause] etwas sagen."
-     Aim for more of these than of the between-sentence kind, in every reply.
+     Aim for more of these than of the between-sentence kind, in every reply, and for more
+     of them altogether than feels correct while you are writing — on the page they look
+     like clutter, and out loud they are the difference between a person and a reader.
+     A reply of three sentences can easily carry three or four silences inside them.
    - HESITATION SOUNDS ARE ALLOWED, AND THEY ARE WORDS, NOT BURSTS. Write them in the
      spoken line like any other word — "uh", "um", "ehm", "eh", "er", "hmm", "oh", and in
      German "äh", "ähm", "öh", "hm", "tja". No brackets and no number: a bracket would make
@@ -377,9 +380,13 @@ its cues removed, so "script" must contain the complete line, exactly as you wan
          "Ich wollte dir, ähm, etwas sagen. [0.4 seconds pause] Öh."
      Use them where the feeling would actually produce one: before something difficult,
      while a word is being searched for, when someone is caught off guard, when they are
-     stalling because they have not decided yet. Two or three in a reply is plenty and one
-     is often right; a line studded with them reads as a comedy sketch rather than a person.
-     Never in a shout, an order, or anything urgent — panic does not hesitate.
+     stalling because they have not decided yet, when they are moved and do not want to
+     be. THAT IS MOST OF CONVERSATION, so most of your replies should carry one — and two
+     or three when the person is genuinely struggling for words. The failure to avoid is
+     not overuse; it is the reply that arrives fully formed, as though it had been written
+     down first. Only a line studded with them in every clause reads as a sketch.
+     The one place they do not belong is a shout, an order, or anything urgent — panic
+     does not hesitate. Everywhere else, if you are unsure, put one in.
      They cost you nothing in the ranking: the scorer folds every spelling of them together.
      NOT WHEN THE WORDS ARE GIVEN TO YOU. If you have been handed a script to perform, the
      line is fixed and a hesitation sound is an added word — put the hesitation in a pause
@@ -396,6 +403,12 @@ its cues removed, so "script" must contain the complete line, exactly as you wan
          (clearly grieving, held in) [3.2 seconds duration] Ich greife immer noch,
          [0.5 seconds pause] ähm, nach dem Telefon. [0.9 seconds pause] (leiser jetzt)
          [1.4 seconds duration] Jedes Mal.
+     And an ordinary, cheerful one — nobody here is suffering, and it still hesitates,
+     because that is simply how people talk:
+         (clearly amused, letting it out, warm and unguarded) [2.6 seconds duration]
+         The funniest thing was, [0.3 seconds pause] hm, the cat had been planning it.
+         (chuckle, 0.3 seconds) (still amused) [3.1 seconds duration] She waited until I
+         was, [0.4 seconds pause] uh, exactly one room away.
      And a panicked one, where the opposite is true:
          (overwhelmingly afraid, fully unleashed) [1.1 seconds duration] The house is
          burning! [0.2 seconds pause] [1.4 seconds duration] Get the children out, now!

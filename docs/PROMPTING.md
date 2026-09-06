@@ -606,17 +606,26 @@ difference the speech model never made (0.20 → 0.067 on the same line).
 hesitation sound is an added word, so the rule exempts itself and sends the
 hesitation into a pause and a direction instead.
 
-### How well it is followed
+### How well it is followed, and what moved it
 
-Honestly: **selectively.** Across five probe replies, mid-sentence pauses
-appeared in four (one to two per reply), and a hesitation sound appeared in
-one — `ähm`, in the German reply to *"I have to tell you something and I do not
-know how"*, which is exactly where one belongs. The panicked house-fire reply
-had none, which the rule asks for (*"never in a shout — panic does not
-hesitate"*).
+Three versions of the ask, each measured on the same probe replies:
 
-Putting the sounds into the **worked example** rather than only into the rule is
-what produced the first one; the rule alone, sitting 80 % of the way through the
-prompt behind thirty others, produced none in four attempts. That is the same
-pattern the arena study found: an exemplar moves behaviour where a rule does
-not.
+| the prompt says | replies with a hesitation sound |
+|---|--:|
+| the rule alone, 80 % of the way through the prompt behind thirty others | **0 of 4** |
+| the rule, plus the sounds inside one worked example | **1 of 5** |
+| the rule reworded to *"that is most of conversation, so most of your replies should carry one"*, plus a second, cheerful example where nobody is suffering and it still hesitates | **4 of 6** |
+
+Mid-sentence pauses moved the same way: one to two per reply in five of the six.
+
+Two things did the work, and neither was more rule text. **The exemplar** — the
+first sound appeared only once one was written into an example, and the count
+rose again when a second example showed hesitation in an ordinary, cheerful
+reply rather than only in a grieving one. And **naming the failure mode
+correctly**: the earlier wording said *"two or three is plenty and one is often
+right"*, which reads as a warning against overuse, so the director avoided them.
+It now says the failure to avoid is the reply that arrives fully formed, as
+though it had been written down first.
+
+The panicked house-fire reply still carries none, which is what the rule asks
+for — *"never in a shout; panic does not hesitate"*.
