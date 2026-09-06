@@ -629,3 +629,78 @@ though it had been written down first.
 
 The panicked house-fire reply still carries none, which is what the rule asks
 for — *"never in a shout; panic does not hesitate"*.
+
+## Two bugs were eating the pauses
+
+Before any of the prompt work below is worth reading, two defects were deleting
+or hiding exactly the silences the prompt was asking for.
+
+**The sanitiser deleted a pause after any round bracket.** The rule it
+implements is real — the manual says a pause directly after a *burst* truncates
+it — but the pattern matched every round bracket, including a plain delivery
+direction. And a delivery direction is where a director puts the first silence
+of a sentence: `(clearly hesitant) [0.5 seconds pause] I wanted to tell you…`
+Every reply was quietly losing one, and the only pauses that survived were the
+ones written mid-clause. It now checks whether the bracket really is a burst.
+
+**The inner-pause test counted a pause at the start of a sentence as inside
+it.** `_has_inner_pause` accepted any pause whose preceding character was not
+sentence punctuation, and `)` is not sentence punctuation. So a pause right
+behind an opening cue looked like a mid-clause silence, which switched the
+`breathe()` floor off on precisely the replies that had none. It now requires
+spoken words before the pause within the same sentence.
+
+With those fixed, `breathe()` also stopped being all-or-nothing: it counts what
+the director wrote and tops the reply up to `BREATHE_WANT` (2) rather than only
+firing when there were none.
+
+## Writing the pacing that a scene needs
+
+The remaining gap was not mechanical. Asked in the chat window for *"more
+pauses and a few filler words"*, the director produced a visibly better take of
+the same line — pauses of 0.6–0.9 instead of 0.3, `speed: slower`, a hesitation
+sound after a mid-clause break, 30.7 seconds instead of 18.6 for the same words.
+The capability was there; the default was not reaching for it.
+
+Two additions closed it.
+
+**`speed` is for the scene.** A reflective, grieving or tender reply sets
+`"speed": "slower"`, a panicked or furious one `"faster"`, and the per-sentence
+durations then shape the line inside that pace. A slow scene written at normal
+speed with 0.3-second pauses is the most common way a reply comes out sounding
+read rather than lived.
+
+**A before/after pair for each strong feeling**, written into the prompt,
+because an exemplar moves this director where a rule does not. The point of each
+pair is not that the second is slower — it is *where* the silence lands and
+*which* disfluency belongs to that feeling:
+
+| feeling | speed | what its disfluency actually is |
+|---|---|---|
+| contentment, reflection | slower | a soft hum, `uh` while the memory opens |
+| fear, panic | faster | **never `uh`** — a caught breath, a word started twice |
+| rage | normal | the pause *is* the control: choosing what not to say |
+| overwhelming joy | faster | the laugh getting in the way of the sentence |
+| grief | slower | the longest silences of any feeling, before the words nobody wants to reach |
+| embarrassment, reluctance | normal | the one place `uh` and `ehm` really belong, and more than one is right |
+
+And the rule underneath: *a 0.3-second pause is the least interesting one you
+can write; reach for 0.6, 0.8, 1.1 whenever the feeling is not urgent.*
+
+### Measured
+
+On the same benchmark scene the comparison came from, with no chat prompting at
+all: `speed` came back `slower`, the pauses **0.7 / 0.6 / 0.8** against the
+earlier 0.3 / 0.4 / 0.3, three of them inside sentences, and the take 27.7
+seconds against 18.6.
+
+Across five free-conversation scenes, `speed` tracked the feeling correctly
+every time — slower for grief, normal for rage and embarrassment, faster for joy
+and fear — with one to two mid-sentence pauses each and a longest pause of
+0.5–0.8.
+
+Hesitation sounds remain the weakest part: they appear in roughly one reply in
+four or five, always in a fitting place. They are deliberately **not** floored
+the way pauses are, because inserting silence is reversible and inserting words
+is not. On a benchmark item they are suppressed entirely — the words there are
+fixed, and an added `uh` would break the verbatim guarantee.

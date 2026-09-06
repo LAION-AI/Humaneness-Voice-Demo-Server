@@ -982,6 +982,13 @@ BON_BATCH_CFG = int(os.environ.get("MOSS_BON_BATCH_CFG", "4"))
 # chose itself is never touched.
 BREATHE_ON = os.environ.get("MOSS_BREATHE", "1") not in ("0", "false", "no")
 BREATHE_MAX = int(os.environ.get("MOSS_BREATHE_MAX", "2"))
+# How many silences a reply should end up with INSIDE its sentences.  The floor
+# used to fire only at zero, which left every reply that managed one sitting at
+# one; it now tops up to this.  Two bugs were deleting or hiding these before
+# the number mattered: the sanitiser stripped any pause following a round
+# bracket, including a delivery direction, and the inner-pause test counted a
+# pause at the start of a sentence as being inside it.
+BREATHE_WANT = int(os.environ.get("MOSS_BREATHE_WANT", "2"))
 
 # ----------------------------------------------------------------- sidon ----
 # Speech restoration as the last step before a clip is heard.  Measured +0.43 of

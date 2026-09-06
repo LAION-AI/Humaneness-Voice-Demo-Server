@@ -131,14 +131,43 @@ def script_text(item):
     return (sc or "").strip()
 
 
+def is_emotion_item(item):
+    """Does this item name a feeling, or a scene / a voice axis?
+
+    Only the emotion track carries a label that can be spoken as a direction.
+    `acting_challenge` labels are categories ("Conflict", "Emergency") and
+    `voicenet` labels are axis codes ("VALS_high"), and forcing either into the
+    adverb-plus-adjective form produces "(clearly conflict)" — which is not a
+    direction, and was measured producing flat, unfitting takes.
+    """
+    tgt = item.get("target") or {}
+    track = str(item.get("track") or "").lower()
+    if track:
+        return track == "emotion"
+    return (str(tgt.get("intensity") or "").lower() in _ADVERB
+            and (tgt.get("label") or "").strip().lower() in _ADJ)
+
+
+def _burst_line(vb):
+    """The item's burst request, however it is written."""
+    if not vb:
+        return None
+    if isinstance(vb, str):
+        return vb
+    bits = [str(vb.get("type") or "").strip()]
+    place = str(vb.get("placement") or "").replace("_", " ").strip()
+    if place:
+        bits.append(f"placed {place}")
+    d = str(vb.get("description") or "").strip()
+    line = ", ".join(b for b in bits if b)
+    return f"{line}. {d}" if d else line
+
+
 def brief(item):
     """The item as a task a small model can follow without parsing anything."""
     text = script_text(item)
     ins = item.get("instruction") or {}
     tgt = item.get("target") or {}
-    label = (tgt.get("label") or "").strip()
-    inten = str(tgt.get("intensity") or "moderate").lower().strip()
-    adv = _ADVERB.get(inten, "clearly")
     desc = ", ".join(tgt.get("descriptors") or [])
 
     L = ["THIS TURN IS A PERFORMANCE, NOT A CONVERSATION.",
@@ -147,24 +176,41 @@ def brief(item):
          "",
          f"    {text}",
          ""]
-    if label:
-        line = (f"The feeling is {label.lower()}, running {adv} — write it as "
-                f"\"{adv} {_adj(label)}\", that is the adverb the voice model "
-                f"was trained against.")
+    if is_emotion_item(item):
+        label = (tgt.get("label") or "").strip()
+        adv = _ADVERB.get(str(tgt.get("intensity") or "moderate").lower().strip(),
+                          "clearly")
+        if label:
+            line = (f"The feeling is {label.lower()}, running {adv} — write it as "
+                    f'"{adv} {_adj(label)}", that is the adverb the voice model '
+                    f"was trained against.")
+            if desc:
+                line += f" It shows as {desc}."
+            L.append(line)
+    else:
+        # scene- or axis-defined: the words for the feeling are the director's
+        # to choose, from the direction and the descriptors
         if desc:
-            line += f" It shows as {desc}."
-        L.append(line)
+            L.append(f"The voice should read as: {desc}.")
+        L.append("No single emotion is named for you. Decide what the person is "
+                 "feeling from the situation and the direction below, name it in "
+                 "plain words in your first bracket, and give it the adverb that "
+                 "matches how hard it is running.")
     if tgt.get("valence") or tgt.get("arousal"):
         L.append(f"Valence {tgt.get('valence') or 'n/a'}, arousal "
                  f"{tgt.get('arousal') or 'n/a'}.")
+    if str(tgt.get("mode") or "").strip().lower() == "arc":
+        L.append("THIS IS AN ARC: the feeling must not stay where it starts. "
+                 "Let the later brackets turn it somewhere the first one did not "
+                 "promise.")
     if ins.get("context"):
         L.append(f"The situation: {ins['context']}")
     if ins.get("performance_direction"):
         L.append(f"How to play it: {ins['performance_direction']}")
-    vb = ins.get("vocal_burst")
+    vb = _burst_line(ins.get("vocal_burst"))
     if vb:
-        L.append(f"This item calls for a vocal burst: {vb}. Give it its own "
-                 f"bracket with a length, between sentences.")
+        L.append(f"This item calls for a vocal burst: {vb} Give it its own "
+                 f"bracket with a length in seconds.")
     else:
         L.append("This item does not require a vocal burst. Add one only if the "
                  "moment genuinely wants it.")
@@ -194,9 +240,15 @@ def annotate(item):
     text = script_text(item)
     tgt = item.get("target") or {}
     ins = item.get("instruction") or {}
-    label = _adj(tgt.get("label"))
-    adv = _ADVERB.get(str(tgt.get("intensity") or "moderate").lower().strip(),
-                      "clearly")
+    if is_emotion_item(item):
+        label = _adj(tgt.get("label"))
+        adv = _ADVERB.get(str(tgt.get("intensity") or "moderate").lower().strip(),
+                          "clearly")
+    else:
+        # no usable emotion word: fall back to the first descriptor
+        ds = [d for d in (tgt.get("descriptors") or []) if d]
+        label = str(ds[0]).lower() if ds else "engaged"
+        adv = "clearly"
     held = "letting it out, not hiding it"
     d = (ins.get("performance_direction") or "").lower()
     if any(w in d for w in ("tucked", "held", "contain", "not to", "restrain",
@@ -221,10 +273,23 @@ _BREATH = re.compile(
 
 
 def _has_inner_pause(script):
-    """A pause tag that is not simply sitting between two sentences."""
+    """A pause with spoken words before it inside the same sentence.
+
+    This used to accept any pause whose preceding character was not sentence
+    punctuation — which includes the ")" of an opening delivery direction.  A
+    pause written there sits at the START of a sentence, not inside one, and
+    counting it as inner switched `breathe()` off on exactly the replies that
+    had no mid-clause silence at all.
+    """
     for m in re.finditer(r"\[[^\]]*pause[^\]]*\]", script or "", re.I):
-        before = script[:m.start()].rstrip()
-        if before and before[-1] not in ".!?…":
+        before = script[:m.start()]
+        # back to the start of this sentence
+        cut = max(before.rfind("."), before.rfind("!"), before.rfind("?"),
+                  before.rfind("…"))
+        head = before[cut + 1:] if cut >= 0 else before
+        # spoken words only: brackets are cues, not speech
+        head = re.sub(r"\([^)]*\)|\[[^\]]*\]", " ", head)
+        if head.strip():
             return True
     return False
 
@@ -252,14 +317,29 @@ def add_breath_pauses(text, force=False, limit=2, length=0.3):
     return re.sub(r"\s+", " ", out).strip()
 
 
-def breathe(script, limit=2):
-    """Give a reply its breath back if the model wrote it without any.
+def _count_inner(script):
+    """How many pauses have spoken words before them in their own sentence."""
+    n = 0
+    for m in re.finditer(r"\[[^\]]*pause[^\]]*\]", script or "", re.I):
+        if _has_inner_pause(script[:m.end()]):
+            n += 1
+    return n
 
-    Only fires when there is no pause inside any sentence — an explicit choice
-    by the model is never overwritten — and only at commas, dashes and the
-    conjunctions that begin a new thought.
+
+def breathe(script, limit=2, want=1):
+    """Top a reply up to `want` silences inside its sentences.
+
+    It used to fire only when there were none at all, which left every reply
+    that managed one sitting at one.  It now counts what the model wrote and
+    adds the difference, so an explicit choice is still never overwritten — the
+    additions go at commas, dashes and the conjunctions that begin a new
+    thought, and only where four words precede and three follow.
     """
-    if not script or _has_inner_pause(script):
+    if not script:
+        return script, 0
+    have = _count_inner(script)
+    limit = min(limit, max(0, want - have))
+    if limit <= 0:
         return script, 0
     parts = re.split(r"(\([^)]*\)|\[[^\]]*\])", script)
     n = 0

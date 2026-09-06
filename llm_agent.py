@@ -391,6 +391,74 @@ its cues removed, so "script" must contain the complete line, exactly as you wan
      NOT WHEN THE WORDS ARE GIVEN TO YOU. If you have been handed a script to perform, the
      line is fixed and a hesitation sound is an added word — put the hesitation in a pause
      and a direction instead.
+   - USE "speed" FOR THE WHOLE SCENE, not just the durations. A reflective, grieving or
+     tender reply should set "speed": "slower"; a panicked or furious one "faster". The
+     per-sentence durations then shape the line inside that pace. A slow scene written at
+     "normal" speed with short pauses is the single most common way a reply comes out
+     sounding read rather than lived.
+   - WHAT THIS ACTUALLY LOOKS LIKE, PER FEELING. Every pair below is the SAME words. The
+     first is what comes out when nobody is thinking about time; the second is what a
+     performance sounds like. Notice that the second is not merely slower — the silences
+     land inside clauses, the hesitation sounds fit the specific feeling, and the bursts
+     come where the body would act.
+
+     CONTENTMENT / REFLECTION — "speed": "slower"
+       flat:  (clearly content) I nearly packed my office badge out of habit this morning.
+              [0.3 seconds pause] For thirty-two years, Monday meant the same platform.
+       alive: (clearly content, letting it out, warm and private; easy, lightly breathed)
+              [3.8 seconds duration] I nearly packed my office badge, [0.7 seconds pause]
+              uh, out of habit this morning. (soft hum, 0.2 seconds) (still content,
+              reflective and slower) [6.8 seconds duration] For thirty-two years, Monday
+              meant the same platform, [0.8 seconds pause] in the opposite direction.
+
+     FEAR / PANIC — "speed": "faster". Panic does NOT hesitate: no "uh", no "hm". Its
+     disfluency is the caught breath and the word started twice.
+       flat:  (intensely afraid) There is someone outside. [0.3 seconds pause] We have to
+              go right now.
+       alive: (overwhelmingly afraid, fully unleashed, breath fast and shallow)
+              [1.2 seconds duration] There is someone — (sharp inhale, 0.15 seconds)
+              [1.4 seconds duration] there is someone outside. [0.2 seconds pause]
+              [1.6 seconds duration] We have to go, we have to go now.
+
+     RAGE — "speed": "normal", and the pauses are the CONTROL, not the hesitation. A
+     furious person stops because they are choosing what not to say.
+       flat:  (intensely angry) You went behind my back. [0.3 seconds pause] After
+              everything I did for you.
+       alive: (intensely angry, fought down rather than shown, jaw tight)
+              [2.2 seconds duration] You went [0.6 seconds pause] behind my back.
+              (sharp exhale, 0.2 seconds) (the control slipping) [1.4 seconds duration]
+              After — [0.9 seconds pause] [2.4 seconds duration] after everything.
+
+     OVERWHELMING JOY — "speed": "faster", and the breaks are the laugh getting in the way
+     of the sentence, not thinking.
+       flat:  (intensely delighted) I cannot believe you did this. [0.3 seconds pause] It
+              is the best thing anyone has done for me.
+       alive: (overwhelmingly delighted, letting it out, breathless) [1.6 seconds duration]
+              I cannot — (laugh, 0.4 seconds) [2.1 seconds duration] I cannot believe you
+              did this. [0.3 seconds pause] (still laughing through it)
+              [2.8 seconds duration] It is the best thing, [0.4 seconds pause] the best
+              thing anyone has ever done for me.
+
+     GRIEF — "speed": "slower". The longest silences of any feeling, and they go before the
+     words the person does not want to reach.
+       flat:  (intensely sad) I keep expecting him to call. [0.3 seconds pause] It has been
+              a year.
+       alive: (intensely grieving, held in and only leaking at the edges)
+              [3.2 seconds duration] I keep [0.8 seconds pause] expecting him to call.
+              [1.1 seconds pause] (quieter) [2.2 seconds duration] It has been,
+              [0.7 seconds pause] hm, a year now.
+
+     EMBARRASSMENT / RELUCTANCE — the one feeling where "uh" and "ehm" really belong, and
+     more than one is right.
+       alive: (clearly embarrassed, held in) [2.4 seconds duration] I did not, [0.6 seconds
+              pause] ehm, I did not actually read it. [0.7 seconds pause] (smaller)
+              [1.8 seconds duration] Any of it, [0.5 seconds pause] uh, at all.
+
+     THE RULE UNDERNEATH ALL OF THEM: a short pause is 0.3 and it is the LEAST interesting
+     one you can write. Reach for 0.6, 0.8, 1.1 whenever the feeling is not urgent. And a
+     hesitation sound must belong to its feeling — thinking and reluctance say "uh" and
+     "ehm"; fear catches its breath; rage exhales; joy laughs mid-word. Never sprinkle one
+     in because the rule exists.
      THIS IS WHAT A SLOW, SAD REPLY LOOKS LIKE WRITTEN OUT — note the square brackets on
      both kinds of number, the silences sitting BETWEEN WORDS rather than after full stops,
      and the hesitation sound written as an ordinary word:
@@ -1050,7 +1118,8 @@ class LLMAgent:
         try:
             import benchmark
             sc, n = benchmark.breathe(out.get("script") or "",
-                                      limit=config.BREATHE_MAX)
+                                      limit=config.BREATHE_MAX,
+                                      want=config.BREATHE_WANT)
             if n:
                 out["script"] = sc
                 print(f"[breathe] added {n} pause(s) the model left out",
@@ -1102,8 +1171,19 @@ class LLMAgent:
         # any run of >=2 capitals becomes lower case ("I" and "AI" style acronyms
         # of one or two letters at a word boundary are left alone)
         s = re.sub(r"\b[A-ZÄÖÜ]{3,}\b", lambda m: m.group(0).lower(), s)
-        # the manual is explicit that a pause directly after a burst truncates it
-        s = re.sub(r"(\([^)]*\))\s*\[[^\]]*pause[^\]]*\]", r"\1", s, flags=re.I)
+        # The manual is explicit that a pause directly after a BURST truncates
+        # it.  This used to match any round bracket, so it also deleted the
+        # pause after a delivery direction — which is where a director puts the
+        # first silence of a sentence, right behind its cue.  Every reply was
+        # quietly losing one, and the ones that survived were the ones written
+        # mid-clause.  Only strip it when the bracket really is a burst.
+        def _drop_after_burst(m):
+            import timed_script as _ts
+            body = m.group(1)[1:-1]
+            is_burst = bool(re.search(r"[0-9]", body)) or _ts._is_burst_label(body)
+            return m.group(1) if is_burst else m.group(0)
+        s = re.sub(r"(\([^)]*\))\s*\[[^\]]*pause[^\]]*\]", _drop_after_burst,
+                   s, flags=re.I)
         # Square brackets are only for [pause]; a burst written as "[a soft sigh]"
         # would otherwise be stripped as markup and never performed at all.
         s = re.sub(r"\[([^\]]*)\]",
