@@ -1090,6 +1090,25 @@ async def _turn(body):
                             if lab and lab not in tagged:
                                 tagged.append(lab)
                     tagged = tagged[:config.BURST_MAX_ADAPTERS]
+                    # SOLO CEILING.  A single burst adapter may go to
+                    # BURST_LAM_MAX_SOLO (1.5); two may not.  Both halves are
+                    # measured: two at 1.5 destroyed the line in 5 of 5 seeds
+                    # (median word error 0.82) while one at 1.5 came back clean
+                    # every time, and study `vb_opt` found the 1.5 ceiling adds
+                    # +0.0275 to the candidate mean but only +0.0050 to the
+                    # DELIVERED take -- the extra burst was generated and then
+                    # not selected.  So it is gated on a burst-aware ranker
+                    # existing, which is BON_BURST_WEIGHT > 0 with best-of-N on.
+                    # An explicit burst_lam_max in the request always wins.
+                    if (len(tagged) == 1
+                            and body.get("burst_lam_max") is None
+                            and config.BON_ON
+                            and config.BON_BURST_WEIGHT > 0
+                            and config.BURST_LAM_MAX_SOLO > _cap):
+                        print(f"[skills] one burst ({tagged[0]}): ceiling "
+                              f"{_cap:g} -> {config.BURST_LAM_MAX_SOLO:g}",
+                              flush=True)
+                        _cap = config.BURST_LAM_MAX_SOLO
                     specs = [(n, l) for n, l in specs if not n.startswith("burst")]
                     # Fit the whole set inside the budget by SCALING, not by
                     # dropping.  Bursts carry the drama of a line — a scream that

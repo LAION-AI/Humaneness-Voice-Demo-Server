@@ -14,13 +14,34 @@ little more than one take.
 
 ## The reward
 
-    R = (norm(genuineness) + norm(blend) + 2 * norm(clap)) * gate(WER)
+    R = (norm(genuineness) + norm(blend) + 2 * norm(clap)
+         + 2 * norm(burst)) * gate(WER)
 
 `clap` is the cosine between the take's VoiceCLAP-commercial *audio* embedding
 and the *text* embedding of what the director asked for — GENERAL plus every
 round bracket in the script.  It carries double weight because it is the only
 term that measures whether the take is the performance that was requested; the
 other two measure whether it is a good take of anything.
+
+`burst` is new (2026-09-07, study `vb_opt`, protocol section 71).  The four
+terms above ask whether a take is good and whether it is the performance that
+was requested.  None of them asks whether the SOUND the script names is
+actually in the audio, and measured over 1,940 candidate sets only `clap`
+tracks burst presence at all (r +0.148); `blend` points the wrong way (-0.084).
+Restricted to the configuration the server is always in — a carrier voice with
+its own `sft3_voice` adapter — the old reward's burst lift is +0.0104 (t 1.51),
+indistinguishable from zero.  With this term the strict hit rate of the
+DELIVERED take rises +0.0454 (t 7.60, +37 % relative), scored by a detector
+other than the one ranking.  It is a trade: CLAP falls 0.0055 (t -6.82), which
+is 3.6 % of the range a re-ranker can move.  See `config.BON_BURST_WEIGHT` for
+why 2.0 and for the unguided caveat.
+
+The term is `s_strict + 0.5*(s_fam - s_strict) + 0.25*s_pres + 0.5*agree`,
+averaged over the bursts the turn actually requested.  A turn that requests none
+carries **no `burst` key**, and `rank` then forces the term to exactly 0 so the
+ranking is unchanged.  Note that leaving it to `_norm` is not enough: `_norm` of
+a constant vector returns 0.5, and a constant inside the sum still re-weights
+every candidate once the per-candidate WER gate multiplies it.
 
 Normalisation is within the candidate set, not against an absolute scale.  Only
 the ranking matters, the three scorers have unrelated ranges (0-6, 0-10, a
@@ -89,13 +110,24 @@ def rank(cands):
     g = _norm([c.get("genuineness", 0.0) for c in cands])
     b = _norm([c.get("blend", 0.0) for c in cands])
     p = _norm([c.get("clap", 0.0) for c in cands])
+    # A turn that asked for no sound carries no `burst` key at all, and then the
+    # term must be EXACTLY zero.  `_norm` of a constant vector returns 0.5, not
+    # 0 -- and a constant 0.5 inside the sum is NOT harmless, because the sum is
+    # multiplied by a per-candidate gate afterwards, so it quietly re-weights
+    # every candidate by its own word error rate.  Measured on a 3-candidate
+    # fixture: it changed the winner.  Hence the explicit guard.
+    _has_burst = any(c.get("burst") is not None for c in cands)
+    u = (_norm([c.get("burst", 0.0) for c in cands]) if _has_burst
+         else [0.0] * len(cands))
     for i, c in enumerate(cands):
         c["n_genuineness"] = round(float(g[i]), 4)
         c["n_blend"] = round(float(b[i]), 4)
         c["n_clap"] = round(float(p[i]), 4)
+        c["n_burst"] = round(float(u[i]), 4)
         c["gate"] = round(gate(c.get("wer", 0.0)), 4)
         c["reward"] = round(
-            float((g[i] + b[i] + config.BON_CLAP_WEIGHT * p[i]) * c["gate"]), 4)
+            float((g[i] + b[i] + config.BON_CLAP_WEIGHT * p[i]
+                   + config.BON_BURST_WEIGHT * u[i]) * c["gate"]), 4)
     order = sorted(range(len(cands)), key=lambda i: -cands[i]["reward"])
     for pos, i in enumerate(order):
         cands[i]["rank"] = pos

@@ -267,6 +267,14 @@ its cues removed, so "script" must contain the complete line, exactly as you wan
      A quick catch of breath is 0.15, an ordinary chuckle 0.3, a sigh you want heard 0.5, a full
      scream 0.6 to 1.0. Anything past 1.2 is outside what the model has heard and will be trimmed.
      If you leave the number off the server supplies 0.28, but you know the moment and it does not.
+   - WHEN IN DOUBT, WRITE ONE BURST RATHER THAN TWO, and make it the one that carries the moment.
+     One burst is not a compromise here — it is the stronger setting. A single burst adapter is
+     allowed to be driven to 1.5, where two are held to 1.25 each, because two adapters at 1.5
+     destroyed the line in 5 of 5 seeds (word error 0.82) while one at 1.5 came back clean every
+     time. And the whole reply shares a merge budget: a second burst does not add to the first, it
+     divides what the first could have had. So two mild sounds land weaker than one that is really
+     there. Write two only when the moment genuinely has two — a caught breath and then a laugh —
+     and never write a third.
    - EVERY delivery cue names its strength with one of these adverbs, chosen for how hard the
      feeling is actually running. This is the same scale the model was trained against, so the
      word does real work:

@@ -681,6 +681,21 @@ BURST_LAM_INTENSE = float(os.environ.get("MOSS_BURST_LAM_INTENSE", "0.5"))
 # preference adapter at 1.5 are already merged before a burst arrives.
 BURST_LAM_MAX = float(os.environ.get("MOSS_BURST_LAM_MAX", "1.25"))
 
+# The SOLO ceiling: what a single burst adapter may reach when it is the only
+# one in the stack.  Two separate measurements agree that one adapter at 1.5 is
+# safe and two are not -- the merge planner's own note records two adapters at
+# 1.5 destroying the line in 5 of 5 seeds (median word error 0.82) while one at
+# 1.5 came back clean every time -- so the ceiling that protects a two-burst
+# line is stricter than a one-burst line needs.
+# Study `vb_opt` measured raising the ceiling to 1.5 across the board: +0.0275
+# on the candidate MEAN (t 2.31) and +0.0050 on the DELIVERED take (t 0.15).
+# The extra burst was generated and then not selected.  That is exactly the
+# condition this becomes worth doing under, and it is now met: with
+# BON_BURST_WEIGHT the ranker can see the burst it is choosing.
+# So this applies only when BOTH hold -- exactly one burst adapter, and a
+# burst-aware ranker -- and falls back to BURST_LAM_MAX otherwise.
+BURST_LAM_MAX_SOLO = float(os.environ.get("MOSS_BURST_LAM_MAX_SOLO", "1.5"))
+
 # ---------------------------------------------------------------- generation modes
 # THE THREE LEVERS.  Until now this server had exactly one way to shape a performance:
 # load adapters and write a good prompt.  Two more have since been measured on this
@@ -966,6 +981,51 @@ BON_GUIDANCE = float(os.environ.get("MOSS_BON_GUIDANCE", "3.0"))
 # because the other two terms measure whether a take is good at all rather than
 # whether it is the right one.
 BON_CLAP_WEIGHT = float(os.environ.get("MOSS_BON_CLAP_W", "2.0"))
+# The burst term, added 2026-09-07 from study `vb_opt` (protocol section 71).
+# The four terms above score whether a take is good and whether it is the
+# performance that was asked for.  NONE of them asks whether the sound the
+# script names is actually present.  Measured over 1,940 candidate sets and
+# 15,517 candidates under the full production stack: of the four, only `clap`
+# tracks burst presence at all (within-set r +0.148), `blend` points the WRONG
+# WAY (-0.084) and `genuineness` does nothing (-0.009, CI straddles zero).
+# Restricted to the six carrier voices that have an `sft3_voice` adapter -- the
+# case the server is ALWAYS in, because it falls back to the speaker adapter
+# otherwise -- the shipped reward's burst lift is +0.0104 (t 1.51), i.e. not
+# distinguishable from zero.  The pooled +0.0348 is carried entirely by material
+# that is off the shipped configuration.
+# With this term at 2.0: strict hit rate of the DELIVERED take +0.0454
+# (t 7.60, n 1940, +37 % relative), scored by an independent detector rather
+# than the one doing the ranking.  Price: WER +0.0040 (t 2.49, gate is +0.104)
+# and CLAP -0.0055 (t -6.82) = 3.6 % of the within-set range a re-ranker can
+# actually move.  That is a TRADE, not a free win, and it is stated as one.
+# Why 2.0 and not 3.0: the exchange rate has a knee.  lambda 1->2 buys 3.82 hit
+# per unit of CLAP, 2->3 buys 2.09, 3->5 buys 1.16.
+# CAVEAT ON THE SIZE: every figure above is measured UNGUIDED.  The chat path
+# would run this at guidance 3.0, where the thin guided sub-arm suggests
+# guidance already recovers much of the same gain (+0.0125, t 0.30, against
+# +0.1125, t 2.39 unguided, on 80 sets).  Turn best-of-N on first and measure,
+# then judge this term -- not both at once.
+BON_BURST_WEIGHT = float(os.environ.get("MOSS_BON_BURST_W", "2.0"))
+# Which detector names the sound.  `x2` is ours and is the only one graded
+# across generators: trained on one source and tested on the other it scores
+# 34.2 % / 34.3 % over 17 classes against a 5.88 % chance rate, and beats the
+# old detector on the same test sets (26.6 % / 25.5 %).
+BON_BURST_DETECTOR = os.environ.get("MOSS_BON_BURST_DET",
+                                    "laion/vocal-burst-detector-x2")
+# `commercial` is the drop-in: that tower is already loaded for retrieval, so
+# the marginal cost is one 768->256->18 MLP on an embedding computed per
+# candidate anyway.  `large-v2` scores better (+0.0454 against +0.0314, both
+# crossed) but is a second encoder on the same card.
+BON_BURST_ENCODER = os.environ.get("MOSS_BON_BURST_ENC", "commercial")
+# Soft, not tiered.  Tiering was proposed as the sharper instrument; measured it
+# costs WER +0.046 (t 3.55) against soft's +0.004 -- an order of magnitude --
+# and buys 0.002 of extra hit.  Ranking on a hard tier first discards the
+# intelligibility factor's ordering inside the tier.
+BON_BURST_MODE = os.environ.get("MOSS_BON_BURST_MODE", "soft")
+# 1.0 s windows at a 0.25 s hop, restricted to [t-1.0, t+2.0] around the
+# bracket's expected onset.  Localised beats whole-clip, 0.2082 to 0.1907.
+BON_BURST_WIN_S = float(os.environ.get("MOSS_BON_BURST_WIN", "1.0"))
+BON_BURST_HOP_S = float(os.environ.get("MOSS_BON_BURST_HOP", "0.25"))
 # The intelligibility factor is the raw inverse word error rate.  It used to be
 # flattened to 1.0 above 0.85, which covered most of a candidate set -- six of
 # eight in one run -- so the factor stopped separating precisely where the

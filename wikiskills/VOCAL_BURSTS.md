@@ -10,6 +10,54 @@ did not cover them, so there is no operating point to write down."* There is now
 
 **Listen:** [https://huggingface.co/spaces/laion/moss-vocal-burst-recipes](https://huggingface.co/spaces/laion/moss-vocal-burst-recipes) — 248 takes for these classes, each marked with whether the detector scored it a hit, plus weight-0 controls.
 
+## How many bursts, and how hard — added 2026-09-07
+
+**One burst may be driven to 1.5. Two may not.** The general ceiling
+`BURST_LAM_MAX` is 1.25 and it exists to protect a line carrying two adapters:
+two at 1.5 each destroyed the line in 5 of 5 seeds (median Parakeet word error
+0.82), while the same script with one at 1.5 came back clean every time. A reply
+that tags exactly one burst therefore gets `BURST_LAM_MAX_SOLO` = 1.5 instead.
+
+That raise is **gated on a burst-aware ranker**, and the reason is measured.
+Study `vb_opt` (protocol §71) raised the ceiling to 1.5 across the board and got
+**+0.0275 on the candidate mean (t 2.31) and +0.0050 on the delivered take
+(t 0.15)** — the louder burst was generated and then not chosen, because nothing
+in the old reward asked whether the sound was there. With `BON_BURST_WEIGHT` the
+ranker can see it, so the raise now reaches a listener. Without best-of-N the
+server keeps 1.25.
+
+The practical consequence for a director: **when in doubt write one burst, not
+two.** The whole reply shares a merge budget of 2.0, so a second burst does not
+add to the first — it divides what the first could have had.
+
+## Borrowing a group's adapter (`bestmem`) — READ THE STACK NOTE
+
+`bestmem` means: for a class with no adapter of its own, load the strongest
+adapter of its burst-family group instead. It is available and `skills.py` can
+resolve it, but **its sign depends on the stack it is measured in, and that is
+the whole story of this entry.**
+
+| measured in | Δ delivered vs shipped | t | n |
+|---|--:|--:|--:|
+| study `vb_grp`, 4 always-on adapters | **+0.0762** | +3.76 | — |
+| study `vb_opt`, production stack, 7 always-on adapters | **−0.0531** | −2.50 | 320 |
+
+Same adapters, same prompts, same metric, same seed rule — **opposite sign**.
+The difference is the stack. So:
+
+* **Do not borrow over a class that already has its own measured recipe.** That
+  is exactly the substitution `vb_opt` measured, and under the production stack
+  it loses (−0.0492 on the candidate mean, t −4.70).
+* **Borrowing for a class with NO recipe is a different question and is not
+  measured either way.** There the alternative is no burst adapter at all, and
+  that arm (`w0`) is the worst measured: **−0.0938 delivered (t −3.96)**. A
+  borrowed adapter is the better bet on the evidence available, and it is
+  offered for that case only.
+
+This entry replaces the earlier unqualified recommendation to use `bestmem`
+generally. The rule both studies now agree on is worth stating once: **the stack
+a measurement was made in is part of the measurement.**
+
 ## The 31 classes with a recipe
 
 Everything below is family-relaxed hit rate — the owner accepted a neighbouring class as
