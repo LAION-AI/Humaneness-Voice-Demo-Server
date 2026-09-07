@@ -34,7 +34,12 @@ seeds: 2 × 1.5 broke 5 of 5 takes at a median word error of 0.82, while one at
 That is the opposite of what `config.py` said. The comment there recorded a
 measurement — *"two adapters cost nothing over one (1.5 × 2 → 0.320 against
 0.322)"* — and cited it to justify a budget of 3.0. The difference is the rest
-of the stack: that ladder measured burst adapters on a bare model, while a turn
+of the stack, and **the stack is part of the measurement**: a single-adapter
+ladder on a bare model gives a ceiling of 1.5 and is not wrong, it is answering
+a different question. Every take here carries 5.75 to 7.25 of merged weight
+before a burst adapter is considered at all — the exact list is in
+[`DEPENDENCIES.md`](DEPENDENCIES.md), and `eval/why_babble.py` sets it at the
+top as `BASE` so it can be reproduced or deliberately changed: that ladder measured burst adapters on a bare model, while a turn
 here already carries a voice adapter, three quality adapters, a preference
 adapter, an emotion adapter **and a delivery axis at 1.5** before a burst
 arrives. It is not the single weight that breaks a line here; it is the sum.

@@ -244,7 +244,7 @@ what the director *writes* and which adapter is loaded at which weight. Whether
 more bursts land, and whether the higher per-class doses cost intelligibility,
 needs the detector and the transcription harness, and needs the listening the
 recipes themselves were chosen with:
-[laion/moss-vocal-burst-recipes](https://huggingface.co/spaces/laion/moss-vocal-burst-recipes).
+[the wikiskills/ directory of this repository](https://huggingface.co/spaces/the wikiskills/ directory of this repository).
 
 ## One correction from the same study
 

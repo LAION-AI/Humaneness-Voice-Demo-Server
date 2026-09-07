@@ -105,6 +105,29 @@ def main():
     check(timed_script.STANDING in timed_script.general_line("x", 1.0, "EN"),
           "every GENERAL carries the standing block")
 
+    print("\nhugging face urls in DEPENDENCIES.md")
+    dep = os.path.join(DOCS, "DEPENDENCIES.md")
+    if os.path.exists(dep) and "--urls" in sys.argv:
+        from huggingface_hub import HfApi
+        api = HfApi()
+        urls = sorted(set(re.findall(
+            r"https://huggingface\.co/(?:datasets/)?([\w.-]+/[\w.-]+)",
+            open(dep, encoding="utf-8").read())))
+        bad = []
+        for r in urls:
+            for fn in (api.model_info, api.dataset_info):
+                try:
+                    fn(r)
+                    break
+                except Exception:
+                    continue
+            else:
+                bad.append(r)
+        check(not bad, f"{len(urls)} repositories resolve"
+              + (f" (missing: {bad})" if bad else ""))
+    else:
+        print("  skipped (pass --urls to hit the network)")
+
     print()
     if fails:
         print(f"{len(fails)} problem(s).")
