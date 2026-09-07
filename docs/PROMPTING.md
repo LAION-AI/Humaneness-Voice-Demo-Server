@@ -637,8 +637,27 @@ Word error over the same eight: 0.000, 0.000, 0.000, 0.019, 0.031, 0.067,
 
 The two directors respond differently: the local model took the instruction
 much further, reaching nine mid-clause silences in a German grief scene, while
-luna settles at two in every scene. Two is also what the `breathe()` floor tops
-up to, so luna's number cannot be read as agreement with the prompt.
+luna settled at exactly two in every scene — which was also what the `breathe()`
+floor topped up to, so that two could not be read as agreement with the prompt.
+
+**The floor was therefore raised to three** (`BREATHE_WANT`, with
+`BREATHE_MAX` raised alongside it — the floor adds
+`min(BREATHE_MAX, want - have)`, so a max of 2 silently capped a want of 3).
+Measured again over the same eight replies:
+
+| | want = 2 | want = 3 |
+|---|--:|--:|
+| all replies | 2.9 | **3.1** |
+| hosted `luna` | 2, 2, 2, 2 | **2, 3, 2, 3** |
+| local `gemma-4-12B` | 9, 4, 2, 2 | 5, 3, 2, 5 |
+
+Word error over the eight: 0.000 ×4, 0.024, 0.048, 0.067, 0.093. Luna is no
+longer pinned at a single value.
+
+The floor does not always reach the target, and should not: it only cuts at
+commas, dashes and the conjunctions that begin a new thought, with at least four
+words before and three after. A short reply with two breathing points gets two.
+It adds silence where a speaker would breathe rather than filling a quota.
 
 ### How well it is followed, and what moved it
 
