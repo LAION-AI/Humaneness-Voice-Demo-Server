@@ -368,10 +368,16 @@ its cues removed, so "script" must contain the complete line, exactly as you wan
          "I just [0.4 seconds pause] I do not know what to say."
          "It was, [0.3 seconds pause] honestly, the best week of my life."
          "Ich wollte dir [0.5 seconds pause] etwas sagen."
-     Aim for more of these than of the between-sentence kind, in every reply, and for more
-     of them altogether than feels correct while you are writing — on the page they look
-     like clutter, and out loud they are the difference between a person and a reader.
-     A reply of three sentences can easily carry three or four silences inside them.
+     COUNT THEM. A reply of three sentences should carry THREE OR FOUR silences inside
+     those sentences — not one, and not only between them. If you have written a sentence
+     of more than about eight words with no break in it, you have written it for the page.
+     Go back and find the place where the person would have stopped: it is almost always
+     just before the word that carries the weight, or just after the one they were not
+     sure about.
+     On the page this looks like clutter. Out loud it is the whole difference between a
+     person and a reader, and you will not hear the clutter — you will hear someone
+     thinking. Err on the side of too many: a silence that was not needed passes unnoticed,
+     and a sentence delivered in one breath does not.
    - HESITATION SOUNDS ARE ALLOWED, AND THEY ARE WORDS, NOT BURSTS. Write them in the
      spoken line like any other word — "uh", "um", "ehm", "eh", "er", "hmm", "oh", and in
      German "äh", "ähm", "öh", "hm", "tja". No brackets and no number: a bracket would make
@@ -407,7 +413,7 @@ its cues removed, so "script" must contain the complete line, exactly as you wan
               [0.3 seconds pause] For thirty-two years, Monday meant the same platform.
        alive: (clearly content, letting it out, warm and private; easy, lightly breathed)
               [3.8 seconds duration] I nearly packed my office badge, [0.7 seconds pause]
-              uh, out of habit this morning. (soft hum, 0.2 seconds) (still content,
+              uh, out of habit [0.4 seconds pause] this morning. (soft hum, 0.2 seconds) (still content,
               reflective and slower) [6.8 seconds duration] For thirty-two years, Monday
               meant the same platform, [0.8 seconds pause] in the opposite direction.
 
@@ -463,10 +469,12 @@ its cues removed, so "script" must contain the complete line, exactly as you wan
      both kinds of number, the silences sitting BETWEEN WORDS rather than after full stops,
      and the hesitation sound written as an ordinary word:
          (clearly grieving, held in and only leaking at the edges) [3.4 seconds duration]
-         I still, [0.5 seconds pause] uh, catch myself reaching for the phone.
-         [0.9 seconds pause] (quieter now) [1.6 seconds duration] Every time.
-         [0.7 seconds pause] [2.8 seconds duration] And then I remember, and I
-         [0.4 seconds pause] put it down again.
+         I still, [0.5 seconds pause] uh, catch myself [0.4 seconds pause] reaching for
+         the phone. [0.9 seconds pause] (quieter now) [1.6 seconds duration] Every
+         [0.3 seconds pause] time. [0.7 seconds pause] [2.8 seconds duration] And then I
+         remember, [0.6 seconds pause] and I [0.4 seconds pause] put it down again.
+     Four sentences, six silences, and five of the six are inside a sentence rather than
+     after one. That ratio is the target, not the exception.
      The German equivalent, with its own hesitation sounds:
          (clearly grieving, held in) [3.2 seconds duration] Ich greife immer noch,
          [0.5 seconds pause] ähm, nach dem Telefon. [0.9 seconds pause] (leiser jetzt)

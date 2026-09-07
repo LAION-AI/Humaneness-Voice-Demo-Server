@@ -606,6 +606,40 @@ difference the speech model never made (0.20 → 0.067 on the same line).
 hesitation sound is an added word, so the rule exempts itself and sends the
 hesitation into a pause and a direction instead.
 
+### Denser silence, 7 September
+
+The ask was raised again: more silence *inside* sentences. Two changes, both to
+the part that has been shown to move this director.
+
+**A countable target.** *"A reply of three sentences should carry three or four
+silences inside those sentences — not one, and not only between them. If you
+have written a sentence of more than about eight words with no break in it, you
+have written it for the page."* With the reason it feels wrong to write:
+on the page the breaks look like clutter, out loud they are the whole
+difference, and a silence that was not needed passes unnoticed while a sentence
+delivered in one breath does not.
+
+**Denser examples.** The grieving example now carries six silences across four
+sentences, five of them mid-clause, and says so underneath: *"That ratio is the
+target, not the exception."*
+
+Measured over eight replies, two directors, four scenes each:
+
+| | before | after |
+|---|--:|--:|
+| mid-sentence pauses per reply | ~1.0–1.25 | **2.9** |
+| local `gemma-4-12B` | | 9, 4, 2, 2 |
+| hosted `luna` | | 2, 2, 2, 2 |
+
+Word error over the same eight: 0.000, 0.000, 0.000, 0.019, 0.031, 0.067,
+0.079, 0.189 — no cost. Pause lengths spread 0.3 to 0.9 rather than sitting at
+0.3.
+
+The two directors respond differently: the local model took the instruction
+much further, reaching nine mid-clause silences in a German grief scene, while
+luna settles at two in every scene. Two is also what the `breathe()` floor tops
+up to, so luna's number cannot be read as agreement with the prompt.
+
 ### How well it is followed, and what moved it
 
 Three versions of the ask, each measured on the same probe replies:
