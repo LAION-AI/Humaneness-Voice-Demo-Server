@@ -110,20 +110,33 @@ def main():
     if os.path.exists(dep) and "--urls" in sys.argv:
         from huggingface_hub import HfApi
         api = HfApi()
-        urls = sorted(set(re.findall(
-            r"https://huggingface\.co/(?:datasets/)?([\w.-]+/[\w.-]+)",
-            open(dep, encoding="utf-8").read())))
+        # The namespace is part of the URL and has to be read out of it: the
+        # earlier version consumed only a `datasets/` prefix, so a Space URL
+        # parsed as the repository `spaces/<owner>` and was then looked up in
+        # the model namespace, where it cannot exist.  That reported a live
+        # Space as a dead link -- the check meant to catch documentation drift
+        # produced some.  Try the declared namespace first and the others
+        # after, so a link is dead only when NO namespace has it.
+        KIND = {"datasets/": "dataset", "spaces/": "space", None: "model"}
+        FN = {"model": api.model_info, "dataset": api.dataset_info,
+              "space": api.space_info}
+        found = {}
+        for m in re.finditer(
+                r"https://huggingface\.co/(datasets/|spaces/)?([\w.-]+/[\w.-]+)",
+                open(dep, encoding="utf-8").read()):
+            found.setdefault(m.group(2), set()).add(KIND[m.group(1)])
         bad = []
-        for r in urls:
-            for fn in (api.model_info, api.dataset_info):
+        for repo, kinds in sorted(found.items()):
+            order = sorted(kinds) + [k for k in FN if k not in kinds]
+            for k in order:
                 try:
-                    fn(r)
+                    FN[k](repo)
                     break
                 except Exception:
                     continue
             else:
-                bad.append(r)
-        check(not bad, f"{len(urls)} repositories resolve"
+                bad.append(repo)
+        check(not bad, f"{len(found)} repositories resolve"
               + (f" (missing: {bad})" if bad else ""))
     else:
         print("  skipped (pass --urls to hit the network)")

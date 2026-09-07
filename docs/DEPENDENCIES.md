@@ -61,9 +61,16 @@ Two things, both of which ship **inside this repository**:
 
 * **`wikiskills/`** — the burst recipes, the never-realise list and the
   interaction tables that `skills.py` parses. It is a directory here, not a
-  model repository. An earlier version of `SKILLS.md` cited
-  `laion/moss-vocal-burst-recipes`; **that repository does not exist** and the
-  reference was wrong.
+  model repository.
+
+The listening evidence for those recipes **is** on the Hub, and an earlier
+version of this page said otherwise:
+[laion/moss-vocal-burst-recipes](https://huggingface.co/spaces/laion/moss-vocal-burst-recipes)
+is a **Space** — 248 takes across the recipe classes, each marked with whether
+the detector scored it a hit, plus weight-0 controls. Resolved 7 September 2026:
+`api/spaces/…` 200, `api/models/…` 401, `api/datasets/…` 401. A checker that
+looks only in the model namespace reports it dead; `SKILLS.md` cited it
+correctly all along.
 * **`wikiskills_legacy/`** — the same tree as it stood before the 2026-09-04
   revision, kept so an older result can be traced to the table that produced it.
 
