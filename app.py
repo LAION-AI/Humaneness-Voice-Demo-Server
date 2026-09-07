@@ -1100,10 +1100,28 @@ async def _turn(body):
                     # not selected.  So it is gated on a burst-aware ranker
                     # existing, which is BON_BURST_WEIGHT > 0 with best-of-N on.
                     # An explicit burst_lam_max in the request always wins.
+                    # Gated on a burst-aware ranker EXISTING, which is not the
+                    # same as best-of-N being the server default: the UI turns
+                    # best-of-N on per request, and `config.BON_ON` is only the
+                    # default.  What actually matters is whether this turn will
+                    # be ranked by something that can see the burst — N > 1, a
+                    # non-zero weight, and a detector able to populate the term.
+                    # `bon_n` is computed further down this handler, so read
+                    # the request directly rather than closing over a name that
+                    # is not bound yet — referencing it here threw, the whole
+                    # burst block fell into its `except`, and every burst
+                    # adapter silently dropped to the flat 0.25 default.
+                    try:
+                        _n_req = int(body.get("best_of")
+                                     if body.get("best_of") is not None
+                                     else (config.BON_N if config.BON_ON else 1))
+                    except (TypeError, ValueError):
+                        _n_req = 1
                     if (len(tagged) == 1
                             and body.get("burst_lam_max") is None
-                            and config.BON_ON
+                            and _n_req > 1
                             and config.BON_BURST_WEIGHT > 0
+                            and config.BON_BURST_READY
                             and config.BURST_LAM_MAX_SOLO > _cap):
                         print(f"[skills] one burst ({tagged[0]}): ceiling "
                               f"{_cap:g} -> {config.BURST_LAM_MAX_SOLO:g}",

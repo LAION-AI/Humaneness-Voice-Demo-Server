@@ -111,3 +111,88 @@ Rejected after measuring: **tiered ranking** (WER +0.046, t 3.55, against soft's
 
 No weight in `VOCAL_BURSTS.md` moves. The change is to the ranker, not to any
 recipe. What changes is which of the N candidates is delivered.
+
+---
+
+# Integration on the server that has the models, 7 September 2026
+
+The commit above left the term inert and named the next step. Here is what
+happened when the side with the GPU tried to take it, and why the term is
+**still inert**.
+
+## The encoder named in the config has no matching weights
+
+`BON_BURST_ENCODER = "commercial"` was described as the drop-in because that
+tower is already loaded for retrieval. Checked against the published weights,
+`laion/vocal-burst-detector-x2` ships three heads and **none of them consumes a
+VoiceCLAP-commercial embedding**:
+
+| checkpoint | D | `embedder` / `encoder` field |
+|---|--:|---|
+| `vocal_burst_mlp_x2_s*.pt` | 768 | `FastScorer.emb.encode_waveform (frozen)` |
+| `voiceclap/…_vclap_s*.pt` | 3584 | `FastScorer.emb.encode_waveform (frozen)` |
+| `production/…_prod_s*.pt` | 3584 | `voiceclap-large-v2` |
+
+The 768 of the first head and the 768 of the commercial tower are a
+**coincidence**. That head sits on the old detector's own frozen extractor —
+`laion/vocal-burst-detector-v2` publishes the 0.9 MB head and not the extractor.
+Feeding commercial embeddings into it would run without error and return
+meaningless probabilities, which is the worst failure available: the ranker
+would look burst-aware and rank on noise.
+
+The `production` head is the correct one and needs `voiceclap-large-v2` — an
+**18.15 GB** Qwen2.5-Omni-7B encoder. With the speech model, the scorers and the
+aligner loaded, this box has **1.0 GB free on one card and 2.5 GB on the other**.
+It does not fit.
+
+**So `Judge.score` still does not populate `burst`,** and the reason is a
+missing artefact rather than missing work. What would unblock it, in order of
+preference:
+
+1. a head trained on `laion/voiceclap-commercial` embeddings — 768→256→17, the
+   encoder is already resident and the marginal cost really would be one MLP;
+2. the FastScorer extractor published, which makes the existing 768-d `x2` head
+   usable;
+3. someone with the VRAM for `voiceclap-large-v2` running the `production`
+   ensemble.
+
+## `BON_BURST_READY`
+
+New flag, default **off**. While it is off the fifth summand is dead weight and
+every gate that depends on a burst-aware ranker stays shut. Set it only when a
+detector whose encoder is genuinely loadable is wired in. It exists so that
+"inert" is a state the code knows about rather than a property of a comment.
+
+Verified on this machine: with no `burst` key the rewards and ranks are
+bit-identical to before the merge, and with values injected by hand the ranking
+reorders as specified.
+
+## The solo ceiling was gated on the wrong thing
+
+It read `config.BON_ON`, which is the **server default** for best-of-N and is
+`0` here. The UI and `/api/speak` turn best-of-N on per request, so the gate
+could never open on a turn that actually ran best-of-N, and would have opened on
+none at all. It now reads the request's own `best_of`, and additionally requires
+`BON_BURST_READY` — the ceiling is only safe *because* a burst-aware ranker
+rejects the takes it costs, and that ranker does not exist here yet.
+
+**One bug of our own, worth recording because of how it failed.** The first
+version of that gate referenced `bon_n`, which is computed further down the
+handler. Referencing it threw, the whole burst-weight block fell into its
+`except`, and **every burst adapter silently dropped to the flat 0.25 default** —
+a scream that should merge at 1.25 merging at a fifth of that. The log line said
+`[skills] burst weights unchanged: cannot access local variable 'bon_n'`, which
+is true and reads like a note rather than a fault. Caught by checking the
+applied weights on a turn rather than by reading the log.
+
+## What does work now, tested
+
+| scene | bursts written | adapter and weight | word error |
+|---|--:|---|--:|
+| VNET scream, English | 1 | `burst_abl:ablation_d2_matched__scream` @1.25 | 0.020 |
+| German, missing someone | 1 | `burst:wistful_sigh` @1.0 | 0.240 |
+| the funniest thing | 1 | `burst:chuckle` @1.25 | 0.091 |
+
+Recipe weights are honoured and capped at 1.25, and all three replies wrote
+**exactly one** burst — the director guidance added in the commit above is
+landing.

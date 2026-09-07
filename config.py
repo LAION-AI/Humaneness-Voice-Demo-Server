@@ -1012,11 +1012,29 @@ BON_BURST_WEIGHT = float(os.environ.get("MOSS_BON_BURST_W", "2.0"))
 # old detector on the same test sets (26.6 % / 25.5 %).
 BON_BURST_DETECTOR = os.environ.get("MOSS_BON_BURST_DET",
                                     "laion/vocal-burst-detector-x2")
-# `commercial` is the drop-in: that tower is already loaded for retrieval, so
-# the marginal cost is one 768->256->18 MLP on an embedding computed per
-# candidate anyway.  `large-v2` scores better (+0.0454 against +0.0314, both
-# crossed) but is a second encoder on the same card.
+# NOT a drop-in on this box, checked 7 September 2026 against the published
+# weights.  `laion/vocal-burst-detector-x2` ships three heads and NONE of them
+# consumes a VoiceCLAP-commercial embedding:
+#
+#   vocal_burst_mlp_x2_s*.pt        D=768   embedder "FastScorer.emb.encode_waveform"
+#   voiceclap/..._vclap_s*.pt       D=3584  embedder "FastScorer.emb.encode_waveform"
+#   production/..._prod_s*.pt       D=3584  encoder  "voiceclap-large-v2"
+#
+# The 768 of the first head and the 768 of our commercial tower are a
+# COINCIDENCE: the head sits on the old detector's own frozen extractor, which
+# is not published.  Feeding commercial embeddings into it would run without
+# error and produce meaningless probabilities, which is the worst failure
+# available.  The `production` head is correct and needs `voiceclap-large-v2`,
+# an 18 GB Qwen2.5-Omni encoder — this box has 1.0 GB free on one card and
+# 2.5 GB on the other with the speech model loaded.
+#
+# So the term stays inert here.  See BON_BURST_READY.
 BON_BURST_ENCODER = os.environ.get("MOSS_BON_BURST_ENC", "commercial")
+# Whether anything can actually populate `c["burst"]`.  While this is false the
+# fifth summand is dead weight and every gate that depends on a burst-aware
+# ranker — the solo ceiling below — stays shut.  Set it when a detector whose
+# encoder is genuinely loadable here is wired into Judge.score.
+BON_BURST_READY = os.environ.get("MOSS_BON_BURST_READY", "0") not in ("0", "false")
 # Soft, not tiered.  Tiering was proposed as the sharper instrument; measured it
 # costs WER +0.046 (t 3.55) against soft's +0.004 -- an order of magnitude --
 # and buys 0.002 of extra hit.  Ranking on a hard tier first discards the
