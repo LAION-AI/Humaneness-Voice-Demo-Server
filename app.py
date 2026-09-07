@@ -1479,15 +1479,21 @@ async def _turn(body):
                         None, lambda: _trim_all(waves, raw_waves))
                 cands = STATE["judge"].score(waves, tts.sr, _pl,
                                              general=out["general"],
-                                             script=out["script"])
+                                             script=out["script"],
+                                             tagged=_tg)
                 bestofn.rank(cands)
                 best = min(range(len(cands)), key=lambda i: cands[i]["rank"])
                 bon = {"n": len(cands), "guidance": gv,
                        "ms": round((time.time() - t_bon) * 1000, 1),
                        "chosen": best, "sidon": sidon_used,
-                       "candidates": [{k: c[k] for k in
+                       # `burst` and `n_burst` belong here too: without them
+                       # the term ranked correctly and was invisible in the UI
+                       # and in every log, which reads exactly like a term that
+                       # is not working.
+                       "candidates": [{k: c.get(k) for k in
                                        ("reward", "rank", "gate", "wer", "extra_w",
-                                        "genuineness", "blend", "clap", "sec")}
+                                        "genuineness", "blend", "clap", "sec",
+                                        "burst", "n_burst")}
                                       for c in cands]}
                 print(f"[bestofn] {len(cands)} candidates, g={gv:g}, "
                       f"{bon['ms']:.0f} ms, best reward "

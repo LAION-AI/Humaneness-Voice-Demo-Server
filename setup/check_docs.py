@@ -27,7 +27,8 @@ CLAIMS = [
     ("BON_GUIDANCE", 3.0), ("SPEAK_BEST_OF", 10), ("SPEAK_GUIDANCE", 3.0),
     ("BURST_LAM_BUDGET", 2.0), ("BURST_LAM_MAX", 1.25),
     ("BREATHE_ON", True), ("BREATHE_WANT", 3), ("BREATHE_MAX", 3),
-    ("ENGLISH_CUES", True), ("ALIGN_ON", True), ("SKILLS_ON", True),
+    ("ENGLISH_CUES", True), ("BON_BURST_READY", True),
+    ("BURST_QUANT", "4bit"), ("ALIGN_ON", True), ("SKILLS_ON", True),
     ("PROFILE_LORA_LAM", 1.0), ("SFT3_EMOTION_LAM", 1.0),
 ]
 

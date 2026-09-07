@@ -196,3 +196,81 @@ applied weights on a turn rather than by reading the log.
 Recipe weights are honoured and capped at 1.25, and all three replies wrote
 **exactly one** burst — the director guidance added in the commit above is
 landing.
+
+---
+
+# The detector is running, 7 September 2026
+
+`burst_server.py` on port 8794, started by `./run.sh burst`, on the card the
+language model would otherwise have. `Judge.score` populates `burst` and
+`BON_BURST_READY` ships **on**.
+
+## The encoder question, answered by measuring
+
+`BON_BURST_ENCODER = "commercial"` was never usable — no published head takes
+that embedding. The `production` ensemble needs `voiceclap-large-v2`, an 8.93 B
+Qwen2.5-Omni thinker: 16.6 GB in bf16, which does not fit. Quantisation was the
+only route, and the head was trained on bf16 embeddings, so it had to be checked
+rather than assumed. Against a bf16 CPU reference over 36 windows:
+
+| | cosine median | cosine min | top-1 agrees | VRAM | 36 windows |
+|---|--:|--:|--:|--:|--:|
+| bf16 (CPU reference) | — | — | — | 16.6 GB | 127 s |
+| 8-bit | **0.9959** | 0.9810 | **35/36** | ~10 GB | 9 s |
+| **4-bit (NF4)** | 0.9753 | 0.9517 | **35/36** | **~5.7 GB** | **4 s** |
+
+**4-bit ships.** It blurs the embedding measurably more than 8-bit and its
+*decisions* are exactly as good — the same 35 of 36, and the same single
+borderline window, which was already undecided in bf16 (0.519 against 0.634).
+
+The reason is headroom rather than fidelity. With 8-bit the encoder and the
+app's own scorers came to 21.4 GB of 23.68, and a turn that allocated during
+alignment died with `CUDA out of memory`. Fidelity nobody can measure in the
+ranking is not worth an out-of-memory error in generation. At 4-bit the card
+holds 6.2 GB spare with a turn in flight.
+
+## What had to be built
+
+| file | what it does |
+|---|---|
+| `burst_server.py` | encoder + five-head ensemble; raw int16 in, one score per candidate out |
+| `burst_client.py` | soft in every direction — service down means `None` and `rank` forces the term to 0 |
+| `timed_script.burst_onsets` | `(label, start_seconds)` from a **rendered** script; scoring is localised to `[t−1, t+2]`, which measured 0.2082 against 0.1907 whole-clip |
+| `bestofn.Judge.score` | takes `tagged=` — the rendered script, the only one carrying the durations an onset is computed from |
+
+Our burst labels are prose and the detector knows 17 names, so `ALIAS` maps the
+ones that correspond exactly and `FAMILY_WORDS` places the rest in a family.
+A label with no exact class is scored at the family level only, which is the
+honest thing for a distinction the detector was never trained to make.
+
+**Three things that had to be read out of the artefacts rather than assumed.**
+The head is `BatchNorm`, not `LayerNorm` — the checkpoint carries `running_mean`,
+and guessing would have measured through a wrongly normalised layer. The
+processor needs `torchvision`, which was not installed. And `BatchNorm` in eval
+mode still refuses a batch of one, so a single window is duplicated and halved.
+
+**And one failure worth recording.** The term ranked correctly for two full test
+rounds while appearing to do nothing: `bon["candidates"]` is built from a fixed
+key list, and `burst` and `n_burst` were not in it. In the UI and in every log
+that looks exactly like a term that is not working, and it invites fixing the
+wrong thing.
+
+## It reorders, as designed
+
+```
+"funniest thing", chuckle at 6.8 s
+  rank0  reward 3.425  burst 0.211  n_burst 1.00  clap 0.463
+  rank1  reward 3.000  burst 0.154  n_burst 0.00  clap 0.468
+```
+
+Rank 1 has the **better** CLAP score and loses — the trade the study describes.
+
+## What it costs
+
+**The local director, and the restoration service.** 5.7 GB of encoder plus
+7.6 GB of `llama-server` plus the app's 11.4 GB does not fit on 23.68. Running
+the detector means hosted directors only (`glm`, `luna`, `gemini-flash`).
+`./run.sh stop` and starting without `burst` gives the local model back.
+
+About **1.5 s per candidate**: 4 s for a best-of-3, roughly 15 s for a
+best-of-10.

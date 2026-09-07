@@ -1034,7 +1034,7 @@ BON_BURST_ENCODER = os.environ.get("MOSS_BON_BURST_ENC", "commercial")
 # fifth summand is dead weight and every gate that depends on a burst-aware
 # ranker — the solo ceiling below — stays shut.  Set it when a detector whose
 # encoder is genuinely loadable here is wired into Judge.score.
-BON_BURST_READY = os.environ.get("MOSS_BON_BURST_READY", "0") not in ("0", "false")
+BON_BURST_READY = os.environ.get("MOSS_BON_BURST_READY", "1") not in ("0", "false")
 # Soft, not tiered.  Tiering was proposed as the sharper instrument; measured it
 # costs WER +0.046 (t 3.55) against soft's +0.004 -- an order of magnitude --
 # and buys 0.002 of extra hit.  Ranking on a hard tier first discards the
@@ -1119,3 +1119,22 @@ ENGLISH_CUES = os.environ.get("MOSS_ENGLISH_CUES", "1") not in ("0", "false")
 # not sitting and waiting the way a person in a chat window is.
 SPEAK_BEST_OF = int(os.environ.get("MOSS_SPEAK_BEST_OF", "10"))
 SPEAK_GUIDANCE = float(os.environ.get("MOSS_SPEAK_GUIDANCE", "3.0"))
+
+# ----------------------------------------------------------------- burst ----
+# The burst detector as a service.  Encoder `laion/voiceclap-large-v2` in 8-bit
+# (~9 GB) plus the five-head production ensemble; it needs a card to itself, so
+# it runs where the language model would otherwise be.  8-bit was checked
+# against a bf16 CPU reference: cosine median 0.9959 and the same top-1 class on
+# 35 of 36 windows.  See docs/BURST_REWARD.md.
+BURST_BASE = os.environ.get("MOSS_BURST_BASE", "http://127.0.0.1:8794")
+BURST_TIMEOUT = float(os.environ.get("MOSS_BURST_TIMEOUT", "600"))
+BURST_ENCODER_PATH = os.environ.get(
+    "MOSS_BURST_ENCODER_PATH",
+    "/mnt/nvme/hf_cache/hub/models--laion--voiceclap-large-v2/snapshots/*")
+BURST_DETECTOR_PATH = os.environ.get(
+    "MOSS_BURST_DETECTOR_PATH",
+    "/mnt/nvme/hf_cache/hub/models--laion--vocal-burst-detector-x2/snapshots/*")
+# 4-bit ships: it agrees with bf16 on 35 of 36 top-1 decisions exactly as 8-bit
+# does, at 5.7 GB instead of 10.  The 8-bit build left 2 GB of headroom on this
+# card and a turn allocating during alignment ran out of memory.
+BURST_QUANT = os.environ.get("MOSS_BURST_QUANT", "4bit")

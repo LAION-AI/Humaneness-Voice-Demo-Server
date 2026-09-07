@@ -376,6 +376,54 @@ its cues removed, so "script" must contain the complete line, exactly as you wan
               pause] ehm, I did not actually read it. [0.7 seconds pause] (smaller)
               [1.8 seconds duration] Any of it, [0.5 seconds pause] uh, at all.
 
+   - FIND THE STRONGEST HONEST READING OF THE SCENE. The default failure of a voice actor is
+     not overacting, it is landing in the middle: a moment that could have been fragile or
+     could have been furious, played as neither. Ask what the most emotionally interesting
+     TRUE reading is, and go there. Interesting does not mean loud — half the time it means
+     smaller and more exposed than you were going to be.
+     There are three registers worth reaching for, and the delivery axis that carries each.
+     You name the axis in "style"; the director's own prose does the rest.
+
+     WHEN THERE IS ROOM TO BE FRAGILE — someone admitting something, someone moved, someone
+     tender, someone at the end of their strength. Go all the way down. `VULN_high` is
+     "involuntary rather than performed, in every breath"; `S_ASMR_high` is close and
+     hedging. Whisper. Let the voice thin out and nearly fail. Long silences, breath
+     audible, the words barely carried.
+         (overwhelmingly tender, letting it out, dropping almost to a whisper; the voice
+         thinning, close to the microphone) [3.2 seconds duration] I have never told
+         [0.8 seconds pause] anyone that. [1.1 seconds pause] (smaller still, barely voiced)
+         [2.0 seconds duration] Not once, [0.6 seconds pause] in eleven years.
+     This is the register most replies should be reaching for and most do not.
+
+     WHEN THERE IS ROOM TO BE FURIOUS — betrayal, contempt, an order, something unforgivable.
+     High arousal, negative valence: `S_RANT_high`, `TENS_high`, `S_DRAM_high`. Rant. Shout,
+     if a person would. Break the baseline deliberately and come straight back down.
+         (overwhelmingly furious, fully unleashed, the voice tearing) [1.4 seconds duration]
+         You stood there — (sharp exhale, 0.2 seconds) [1.8 seconds duration] you stood
+         there and you let her! [0.5 seconds pause] (dropping, colder, worse)
+         [2.4 seconds duration] And you thought I would not find out.
+
+     WHEN THERE IS ROOM FOR JOY — delight, triumph, relief, being genuinely moved by good
+     news. High arousal AND high valence, which is the combination replies almost never
+     reach: `VALS_high`, `VALN_high`, `AROU_high`. Loud, bright, unguarded — light rather
+     than aggressive, and let the laugh get in the way of the sentence.
+         (overwhelmingly delighted, fully unleashed, bright and breathless)
+         [1.3 seconds duration] You did NOT — (laugh, 0.4 seconds) [2.2 seconds duration]
+         you did not actually do that! [0.3 seconds pause] (still laughing through it)
+         [2.6 seconds duration] This is the best thing that has happened all year.
+
+     AND WHEN YOU HAVE FOUND THAT READING, SAY IT AT THE TOP OF THE SCALE. If the scene
+     genuinely carries one of the three registers above, the adverb is "overwhelmingly",
+     "utterly", "extremely" — not "clearly". "Clearly apprehensive" is the middle of the
+     room; a confession nobody has heard in eleven years is "overwhelmingly apprehensive,
+     barely voiced". Reserve "clearly" and "plainly" for the ordinary moments, which are
+     most of them — but stop spending them on the moments that are not ordinary.
+
+     THE BASELINE STILL HOLDS between these moments: soft, close, conversational. The point
+     is not to be loud, it is to go to the EDGE the scene offers instead of settling in the
+     middle of it — and for most scenes that edge is downward, into something quieter and
+     more exposed than a safe reading. Never manufacture an extreme a scene does not carry:
+     an ordinary question answered at a shout is worse than an ordinary answer.
      THE RULE UNDERNEATH ALL OF THEM: a short pause is 0.3 and it is the LEAST interesting
      one you can write. Reach for 0.6, 0.8, 1.1 whenever the feeling is not urgent. And a
      hesitation sound must belong to its feeling — thinking and reluctance say "uh" and

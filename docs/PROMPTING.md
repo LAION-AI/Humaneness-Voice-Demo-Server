@@ -757,3 +757,34 @@ four or five, always in a fitting place. They are deliberately **not** floored
 the way pauses are, because inserting silence is reversible and inserting words
 is not. On a benchmark item they are suppressed entirely — the words there are
 fixed, and an added `uh` would break the verbatim guarantee.
+
+## Reaching for the edge the scene offers
+
+Added 7 September. The default failure of a voice actor is not overacting — it
+is landing in the middle: a moment that could have been fragile or could have
+been furious, played as neither. The director is now asked for the strongest
+*honest* reading, and pointed at the delivery axis that carries each register,
+with a worked example for each.
+
+| register | axis | what the example shows |
+|---|---|---|
+| fragile, tender, at the end of one's strength | `VULN_high`, `S_ASMR_high` | whisper, the voice thinning, silences of 0.8–1.1 |
+| furious, betrayed, an order | `S_RANT_high`, `TENS_high`, `S_DRAM_high` | shouting, a word restarted, then dropping colder |
+| delight, triumph, relief | `VALS_high`, `VALN_high`, `AROU_high` | loud and light, the laugh interrupting the sentence |
+
+Two things keep it honest. **The baseline still holds** between those moments —
+soft, close, conversational — and an ordinary question answered at a shout is
+worse than an ordinary answer. And **the adverb has to match**: if the scene
+carries one of these registers the adverb is `overwhelmingly` or `utterly`, not
+`clearly`; `clearly` is for the ordinary moments, which are most of them.
+
+Measured across six extreme scenes on six different voices, the axis matched the
+register every time: a confession nobody has heard in eleven years drew
+`VULN_high` at `slower`, a betrayal `TENS_high` with *extremely*, a marriage
+proposal accepted `VALN_high` at `faster` with *overwhelmingly*, a missing child
+`S_DRAM_high` at `faster`. An ordinary "how was your day" stayed `clearly
+content` at normal speed, which is the case the rule most needed to not break.
+
+Word error stayed clean — 0.000 on three consecutive runs of the quietest scene
+in the set, a whispered line at `VULN_high` and `slower`, which was the one most
+at risk from pushing the register.

@@ -113,3 +113,19 @@ rather than dropped when a turn wants more. The full table is in
 it explicitly at the top; the constant is called `BASE`. Measuring the burst
 adapters alone answers a different question, and both answers are worth having
 as long as nobody mistakes one for the other.
+
+## The burst detector
+
+Two more repositories, needed only when `./run.sh burst` is used:
+
+| what | size | repository |
+|---|--:|---|
+| burst detector, 5-head ensemble + the reference scorer code | 40 MB | [laion/vocal-burst-detector-x2](https://huggingface.co/laion/vocal-burst-detector-x2) |
+| its encoder | 18.15 GB | [laion/voiceclap-large-v2](https://huggingface.co/laion/voiceclap-large-v2) |
+
+The encoder is loaded in 4-bit (~5.7 GB); see [`BURST_REWARD.md`](BURST_REWARD.md)
+for the fidelity measurement behind that choice. `torchvision` is required for
+its processor and is in `requirements.txt`.
+
+**It does not fit beside the local language model.** Running the detector means
+hosted directors only.

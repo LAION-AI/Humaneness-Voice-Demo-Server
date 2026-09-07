@@ -199,8 +199,14 @@ class Judge:
         except Exception:
             return None
 
-    def score(self, waves, sr, plain, general=None, script=None, want=None):
-        """One dict per candidate, ready for `rank`."""
+    def score(self, waves, sr, plain, general=None, script=None, want=None,
+              tagged=None):
+        """One dict per candidate, ready for `rank`.
+
+        `script` is the director's own text, used for the wanted-attribute
+        vector.  `tagged` is the RENDERED script — it carries the durations, so
+        it is the only one from which a burst's onset can be computed.
+        """
         import os
         import tempfile
 
@@ -237,4 +243,21 @@ class Judge:
                 except Exception as e:
                     print(f"[bestofn] asr: {e}", flush=True)
             out.append(c)
+        # Is the sound the script names actually in the audio?  None of the
+        # four terms above asks that -- only `clap` tracks burst presence at
+        # all (r +0.148) and `blend` points the wrong way.  Scored by the
+        # detector service, localised to each burst's own onset, and soft in
+        # every direction: no service means None for every candidate, and
+        # `rank` then forces the term to exactly 0.
+        try:
+            import timed_script as _ts
+            import burst_client as _bc
+            _bursts = _ts.burst_onsets(tagged or "")
+            if _bursts:
+                for c, v in zip(out, _bc.score(waves, sr, _bursts)):
+                    if v is not None:
+                        c["burst"] = v
+        except Exception as e:
+            print(f"[burst] skipped: {type(e).__name__}: {e}", flush=True)
+
         return out

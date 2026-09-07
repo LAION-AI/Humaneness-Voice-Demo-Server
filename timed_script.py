@@ -406,3 +406,25 @@ def neutralise(tagged):
         pos = b
     out.append(s[pos:])
     return " ".join("".join(out).split())
+
+
+def burst_onsets(tagged):
+    """[(label, start_seconds), ...] for every burst in a RENDERED script.
+
+    The burst reward has to look at the audio where the sound was asked for,
+    not at the whole clip — localised scoring measured 0.2082 against 0.1907.
+    Walking the rendered tags in order is exact: every number in the script is
+    a duration the model was told to fill, so the clock is the sum of what
+    came before.
+    """
+    t, out = 0.0, []
+    for m in re.finditer(
+            r"\[\s*([0-9]*\.?[0-9]+)\s*seconds?\s+(pause|duration)\s*\]"
+            r"|\(([^),]+),\s*([0-9]*\.?[0-9]+)\s*seconds?\s*\)",
+            str(tagged or ""), re.I):
+        if m.group(1):
+            t += float(m.group(1))
+        else:
+            out.append((m.group(3).strip(), round(t, 3)))
+            t += float(m.group(4))
+    return out

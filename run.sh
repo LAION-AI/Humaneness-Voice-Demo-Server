@@ -4,6 +4,7 @@
 #   ./run.sh llm     language model only   (GPU $MOSS_LLM_GPU, port 8790)
 #   ./run.sh app     voice model + web UI  (GPU $MOSS_TTS_GPU, port 8792)
 #   ./run.sh sidon   speech restoration    (GPU $MOSS_LLM_GPU, port 8793)
+#   ./run.sh burst   vocal-burst detector  (GPU $MOSS_LLM_GPU, port 8794)
 #   ./run.sh both    all three, backgrounded, logs in ./logs
 #   ./run.sh stop    stop all three
 set -euo pipefail
@@ -20,6 +21,7 @@ export MOSS_TTS_GPU="${MOSS_TTS_GPU:-1}"
 export MOSS_APP_PORT="${MOSS_APP_PORT:-8792}"
 LLM_PORT=8790
 SIDON_PORT="${MOSS_SIDON_PORT:-8793}"
+BURST_PORT="${MOSS_BURST_PORT:-8794}"
 mkdir -p logs
 
 start_llm() {
@@ -53,8 +55,21 @@ start_sidon() {
       --host 127.0.0.1 --port "$SIDON_PORT"
 }
 
+start_burst() {
+  # The 8.93 B encoder in 8-bit needs a card to itself, so it goes where the
+  # language model would be.  Running both is 9 GB + 7.8 GB against 24.5 with
+  # the scorers already there — it does not fit, and this is the trade:
+  # a burst-aware ranker or a local director, not both.
+  echo "[burst] vocal-burst detector on GPU $MOSS_LLM_GPU, port $BURST_PORT"
+  env -u LD_LIBRARY_PATH CUDA_VISIBLE_DEVICES="$MOSS_LLM_GPU" \
+    HF_HOME="${HF_HOME:-$HOME/.cache/huggingface}" \
+    "$VENV/bin/python" -m uvicorn burst_server:app \
+      --host 127.0.0.1 --port "$BURST_PORT"
+}
+
 case "${1:-both}" in
   llm) start_llm ;;
+  burst) start_burst ;;
   app) start_app ;;
   sidon) start_sidon ;;
   both)
@@ -70,6 +85,7 @@ case "${1:-both}" in
     pkill -f "llama-server.*gemma-4-12b" || true
     pkill -f "uvicorn app:app" || true
     pkill -f "uvicorn sidon_server:app" || true
+    pkill -f "uvicorn burst_server:app" || true
     echo "stopped" ;;
-  *) echo "usage: $0 {llm|app|sidon|both|stop}"; exit 1 ;;
+  *) echo "usage: $0 {llm|app|sidon|burst|both|stop}"; exit 1 ;;
 esac
