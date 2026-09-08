@@ -1012,23 +1012,35 @@ BON_BURST_WEIGHT = float(os.environ.get("MOSS_BON_BURST_W", "2.0"))
 # old detector on the same test sets (26.6 % / 25.5 %).
 BON_BURST_DETECTOR = os.environ.get("MOSS_BON_BURST_DET",
                                     "laion/vocal-burst-detector-x2")
-# NOT a drop-in on this box, checked 7 September 2026 against the published
-# weights.  `laion/vocal-burst-detector-x2` ships three heads and NONE of them
-# consumes a VoiceCLAP-commercial embedding:
+# CORRECTED 8 September 2026.  The note that stood here said the 768 of the
+# `x2` head and the 768 of our commercial tower were a COINCIDENCE, that the
+# head's extractor was unpublished, and that feeding it commercial embeddings
+# would produce meaningless probabilities.  That was a sound reading of what was
+# published at the time and it is wrong.  Measured since, on the stored feature
+# vectors of 300 segments present in both feature sets, same keys, same order:
 #
-#   vocal_burst_mlp_x2_s*.pt        D=768   embedder "FastScorer.emb.encode_waveform"
-#   voiceclap/..._vclap_s*.pt       D=3584  embedder "FastScorer.emb.encode_waveform"
-#   production/..._prod_s*.pt       D=3584  encoder  "voiceclap-large-v2"
+#   max |difference|   1.57e-07        cosine min/median/max   1.000000
+#   mean |difference|  6.75e-09        bit-identical           no
 #
-# The 768 of the first head and the 768 of our commercial tower are a
-# COINCIDENCE: the head sits on the old detector's own frozen extractor, which
-# is not published.  Feeding commercial embeddings into it would run without
-# error and produce meaningless probabilities, which is the worst failure
-# available.  The `production` head is correct and needs `voiceclap-large-v2`,
-# an 18 GB Qwen2.5-Omni encoder — this box has 1.0 GB free on one card and
-# 2.5 GB on the other with the speech model loaded.
+# `FastScorer.emb.encode_waveform` IS `laion/voiceclap-commercial`.  The two
+# differ only by float non-determinism and batch composition.  Feeding the x2
+# head commercial embeddings is therefore correct, not meaningless.
 #
-# So the term stays inert here.  See BON_BURST_READY.
+# Independently: `laion/vocal-burst-detector-x2` now also ships `commercial/`,
+# five seeds trained directly on commercial embeddings, so a head that names
+# its encoder explicitly exists and nothing has to rest on the identity above.
+#
+# The class split is what should decide this, not the mean.  Tested on real
+# speech, `large-v2` wins 12 of 17 classes -- the quiet sustained sounds, Sharp
+# Inhale +0.248, Humming +0.240, Deep Breath +0.216, Yawn +0.208 -- and LOSES
+# ON `Scream`, 0.768 against 0.576.  A detector decides whether a hit counts as
+# a hit, so ranking with the big head would systematically undercount the class
+# this project has spent the most effort on.  Do not "upgrade" this default
+# without checking what it costs on screams.  docs/BURST_REWARD.md.
+#
+# The 18 GB `production` head remains out of reach on this box (1.0 GB free on
+# one card, 2.5 GB on the other with the speech model loaded); the 110 M
+# commercial tower is already resident for retrieval.
 BON_BURST_ENCODER = os.environ.get("MOSS_BON_BURST_ENC", "commercial")
 # Whether anything can actually populate `c["burst"]`.  While this is false the
 # fifth summand is dead weight and every gate that depends on a burst-aware

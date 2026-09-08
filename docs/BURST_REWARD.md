@@ -5,6 +5,18 @@ is measured, and **what is deliberately left to the server that has the models**
 
 ## Which detector to score with — read this before changing `BON_BURST_ENCODER`
 
+**First, a correction to a note that was in `config.py` until 8 September.** It
+said the 768-d `x2` head sits on an unpublished extractor, that its dimension
+matching our commercial tower was a coincidence, and that feeding it commercial
+embeddings would produce meaningless probabilities. Measured on the stored
+feature vectors — 300 segments in both feature sets, same keys, same order —
+the two embeddings agree to **max 1.57 × 10⁻⁷, cosine 1.000000**.
+`FastScorer.emb.encode_waveform` **is** `laion/voiceclap-commercial`. The
+reasoning behind the old note was sound; the fact was not, and the difference
+only became measurable once both feature sets existed side by side.
+`vocal-burst-detector-x2` now also ships a `commercial/` head trained directly
+on commercial embeddings, so nothing needs to rest on that identity.
+
 Two heads are available in `laion/vocal-burst-detector-x2` and **they fail on
 different classes**. Measured per class, trained on both sources and tested on
 real speech:
