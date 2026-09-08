@@ -3,6 +3,33 @@
 Added 2026-09-07. Study `vb_opt`, protocol §71. This page says what changed, what
 is measured, and **what is deliberately left to the server that has the models**.
 
+## Which detector to score with — read this before changing `BON_BURST_ENCODER`
+
+Two heads are available in `laion/vocal-burst-detector-x2` and **they fail on
+different classes**. Measured per class, trained on both sources and tested on
+real speech:
+
+* The **3584-d `large-v2`** head wins 12 of 17 classes and is much better on the
+  quiet, drawn-out sounds — Sharp Inhale +0.248, Humming +0.240, Deep Breath
+  +0.216, Yawn +0.208 — and on knowing that nothing is there (0.912 against
+  0.824).
+* The **768-d `commercial`** head wins on the loud, short ones, and most sharply
+  on **`Scream`: 0.768 against 0.576**.
+
+That single exception is why `BON_BURST_ENCODER` defaults to `commercial`, and
+the reason is not only that the tower is already loaded. **A detector decides
+whether a hit counts as a hit**, so ranking candidates with the big head would
+systematically undercount exactly the class this project has spent the most
+effort on. The cheap option is also the better one for the case that matters
+here — that is luck, not design, and it is worth writing down so nobody
+"upgrades" the default without checking what it costs on screams.
+
+Both heads answer "is a sound there at all" at 97-99 % and "which sound is it"
+at 38 % (768-d) and 45 % (3584-d) over 17 classes, against a 5.9 % chance rate.
+The errors are confusions inside a burst family, not deafness; family-level
+scoring adds 16-21 points to both. Neither is reliable enough to gate anything —
+which is why the term below is a soft re-ranking weight and not a filter.
+
 ## The problem
 
 `bestofn.rank` scored four things — genuineness, burst blend, CLAP agreement and
