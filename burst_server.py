@@ -1,4 +1,16 @@
-"""The vocal-burst detector as its own service.
+"""The vocal-burst detector as its own service — the OPTIONAL large-v2 path.
+
+    NOT NEEDED FOR THE DEFAULT.  `bestofn.Judge.burst_scores` scores bursts
+    in-process on the `commercial/` heads, using the VoiceCLAP-commercial tower
+    that retrieval already has loaded: five MLPs of about a megabyte, no second
+    encoder, and the local language model keeps its card.  That is the shipped
+    path.
+
+    This service exists for `laion/voiceclap-large-v2`, which wins 12 of 17
+    classes on real speech — mostly the quiet sustained ones — and loses on
+    Scream, 0.576 against 0.768.  It costs 5.7 GB in 4-bit and the local
+    director, so it is worth starting only when those classes matter.
+
 
 It answers one question the best-of-N reward could not: **is the sound the
 script names actually in the audio?**  See `docs/BURST_REWARD.md` for why that

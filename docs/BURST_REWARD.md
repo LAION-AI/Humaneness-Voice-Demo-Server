@@ -313,3 +313,39 @@ the detector means hosted directors only (`glm`, `luna`, `gemini-flash`).
 
 About **1.5 s per candidate**: 4 s for a best-of-3, roughly 15 s for a
 best-of-10.
+
+---
+
+# The cheap path is the shipped path, 9 September 2026
+
+The correction above changes the integration completely. `FastScorer` **is**
+`laion/voiceclap-commercial`, the tower this server already loads for
+retrieval — and `vocal-burst-detector-x2` now ships `commercial/` heads that
+name that encoder explicitly (`D: 768`, `encoder: voiceclap-commercial`).
+
+So the term is scored **in-process**. `Judge.burst_scores` embeds each window
+with the same `encode_waveform` call `_clap_sim` already uses, and runs five
+MLPs of about a megabyte. No second encoder, no service, no 18 GB download —
+and **the local language model keeps its card**.
+
+```
+[burst] 5 commercial heads on cuda:0
+Tell me the funniest thing that happened   wer=0.050  burst=[0.917, 0.811, 0.732]
+Erzähl mir von jemandem, den du vermisst   wer=0.000  burst=[0.006, 0.002, 0.004]
+```
+
+The second row is the term doing its job: a `wistful sigh` was asked for and
+essentially nothing was detected in any of the three candidates. The reward now
+knows that, where before every term was blind to it.
+
+`burst_server.py` is kept as the **optional** `voiceclap-large-v2` path. That
+encoder wins 12 of 17 classes on real speech, mostly the quiet sustained ones,
+and loses on Scream (0.576 against 0.768). It costs 5.7 GB in 4-bit and the
+local director, so start it only when those classes matter.
+
+**One bug from the switch, worth the line it takes.** A partial download leaves
+a second snapshot directory, and `glob(...)[0]` found the older one without
+`commercial/`. The heads silently did not load, the term returned `None` for
+every candidate, and the only sign was `[burst] 0 commercial heads`. It now
+picks the snapshot that actually has them and raises with the fetch command if
+none does.

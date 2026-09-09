@@ -123,9 +123,9 @@ Two more repositories, needed only when `./run.sh burst` is used:
 | burst detector, 5-head ensemble + the reference scorer code | 40 MB | [laion/vocal-burst-detector-x2](https://huggingface.co/laion/vocal-burst-detector-x2) |
 | its encoder | 18.15 GB | [laion/voiceclap-large-v2](https://huggingface.co/laion/voiceclap-large-v2) |
 
-The encoder is loaded in 4-bit (~5.7 GB); see [`BURST_REWARD.md`](BURST_REWARD.md)
-for the fidelity measurement behind that choice. `torchvision` is required for
-its processor and is in `requirements.txt`.
-
-**It does not fit beside the local language model.** Running the detector means
-hosted directors only.
+**The encoder is only needed for the optional large-v2 path.** By default the
+burst term is scored in-process on the `commercial/` heads, which take the
+768-d embedding of `laion/voiceclap-commercial` — already loaded for retrieval —
+so nothing extra is downloaded and the local language model keeps its card.
+`laion/voiceclap-large-v2` wins 12 of 17 classes and loses on Scream; it costs
+5.7 GB in 4-bit and the local director. See [`BURST_REWARD.md`](BURST_REWARD.md).

@@ -1783,8 +1783,9 @@ async def speak(req: Request):
     meta["total_ms"] = round((time.time() - t0) * 1000, 1)
     if cands:
         meta["candidates"] = [{k: c.get(k) for k in
-                               ("rank", "reward", "wer", "genuineness",
-                                "blend", "clap", "sec")} for c in cands]
+                               ("rank", "reward", "gate", "wer", "extra_w",
+                                "genuineness", "blend", "clap", "burst",
+                                "n_burst", "sec")} for c in cands]
         # With best_of_audio the candidates carry their own audio too, encoded
         # the same way the winner is.  Without this a caller who wanted to hear
         # all ten got ten scores and one file, which is the least useful half.

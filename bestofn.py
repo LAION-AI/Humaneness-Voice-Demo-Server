@@ -56,6 +56,7 @@ the line has to lose regardless of how good it sounds.
 """
 import re
 
+import os
 import numpy as np
 
 import config
@@ -80,6 +81,50 @@ def _norm(v):
     if not np.isfinite(lo) or not np.isfinite(hi) or hi - lo < 1e-9:
         return np.ones_like(a) * 0.5
     return (a - lo) / (hi - lo)
+
+
+# Our burst labels are prose; the detector knows 17 names.  An exact match
+# gives the strict term, anything else is scored at the family level only —
+# the honest thing for a distinction the detector was never trained to make.
+_BURST_ALIAS = {
+    "scream": "Scream", "shriek": "Scream", "chuckle": "Chuckle",
+    "laugh": "Chuckle", "giggle": "Breathy Giggle", "snicker": "Chuckle",
+    "sharp inhale": "Sharp Inhale", "gasp": "Sharp Inhale",
+    "fearful gasp": "Sharp Inhale", "surprised gasp": "Sharp Inhale",
+    "deep breath": "Deep Breath", "heavy breathing": "Heavy Breathing",
+    "panting": "Panting", "yawn": "Yawn", "humming": "Humming",
+    "soft hum": "Soft Hum", "hum": "Soft Hum", "relief sigh": "Relief Sigh",
+    "wistful sigh": "Wistful Sigh", "contented sigh": "Wistful Sigh",
+    "exasperated sigh": "Exasperated Sigh", "sigh": "Exasperated Sigh",
+    "frustrated groan": "Frustrated Groan", "groan": "Frustrated Groan",
+    "exhausted groan": "Exhausted Groan", "grunt": "Affirmative Grunt",
+}
+_BURST_FAMILY = {
+    "scream": "scream", "shriek": "scream", "wail": "scream",
+    "laugh": "laugh", "giggle": "laugh", "chuckle": "laugh",
+    "sigh": "sigh", "breath": "breath", "inhale": "breath",
+    "exhale": "breath", "gasp": "breath", "pant": "breath", "hum": "hum",
+    "groan": "groan", "grunt": "groan", "moan": "groan", "yawn": "yawn",
+}
+
+
+def _resolve_burst(label, classes, families):
+    """(class index or None, family name) for one of our burst labels."""
+    s = str(label or "").strip().lower().replace("_", " ")
+    name = _BURST_ALIAS.get(s)
+    if name is None:
+        best = ""
+        for k, v in _BURST_ALIAS.items():
+            if k in s and len(k) > len(best):
+                best, name = k, v
+    idx = classes.index(name) if name in (classes or []) else None
+    fam = families[idx] if idx is not None else None
+    if fam is None:
+        for w, f in _BURST_FAMILY.items():
+            if w in s:
+                fam = f
+                break
+    return idx, fam
 
 
 def gate(wer, knee=None):
@@ -186,6 +231,131 @@ class Judge:
             print(f"[bestofn] clap failed: {e}", flush=True)
             return 0.0
 
+    # ---------------------------------------------------------- bursts ----
+    # The head is 768 -> 256 -> 17 on `encode_waveform` output, which is the
+    # tower already loaded for retrieval — `FastScorer.emb.encode_waveform` and
+    # `laion/voiceclap-commercial` were measured identical to cosine 1.000000.
+    # So this runs in-process on five MLPs of about a megabyte each; no second
+    # encoder, no service, and the local language model keeps its card.
+    _heads = None
+    _hcls = None
+    _hfam = None
+
+    def _load_heads(self):
+        if Judge._heads is not None:
+            return bool(Judge._heads)
+        import glob
+        import torch
+        import torch.nn as nn
+        Judge._heads = []
+        try:
+            # Pick the snapshot that actually HAS the heads: a partial
+            # download leaves a second snapshot directory, and taking [0]
+            # silently found the older one without `commercial/`.
+            files = []
+            for snap in sorted(glob.glob(config.BURST_DETECTOR_PATH)):
+                got = sorted(glob.glob(os.path.join(
+                    snap, "commercial", "vocal_burst_mlp_prod_s*.pt")))
+                if len(got) > len(files):
+                    files = got
+            if not files:
+                raise FileNotFoundError(
+                    "no commercial/ heads under "
+                    f"{config.BURST_DETECTOR_PATH} — run "
+                    "python setup/fetch_all.py")
+
+            class Head(nn.Module):
+                def __init__(self, D, H, C, dropout):
+                    super().__init__()
+                    # BatchNorm, not LayerNorm — the checkpoint carries
+                    # running_mean, and guessing would normalise wrongly.
+                    self.net = nn.Sequential(
+                        nn.Linear(D, H), nn.BatchNorm1d(H), nn.GELU(),
+                        nn.Dropout(dropout), nn.Linear(H, C))
+
+                def forward(self, x):
+                    return self.net(x)
+
+            for f in files:
+                ck = torch.load(f, map_location="cpu", weights_only=False)
+                a = ck["arch"]
+                assert str(ck.get("encoder", "")).startswith("voiceclap-comm"), \
+                    f"{f} expects {ck.get('encoder')}, not the retrieval tower"
+                h = Head(a["D"], a["H"], a["C"], a["dropout"])
+                h.load_state_dict(ck["state_dict"])
+                Judge._heads.append(h.eval().to(self.clap.device))
+                Judge._hcls, Judge._hfam = ck["classes"], ck["family"]
+            print(f"[burst] {len(Judge._heads)} commercial heads on "
+                  f"{self.clap.device}", flush=True)
+        except Exception as e:
+            print(f"[burst] heads unavailable: {type(e).__name__}: {e}",
+                  flush=True)
+            Judge._heads = []
+        return bool(Judge._heads)
+
+    def burst_scores(self, waves, sr, bursts):
+        """One burst score per candidate, or None each.
+
+        Localised to `[t-1, t+2]` around each onset in windows of
+        BON_BURST_WIN_S at BON_BURST_HOP_S — localised measured 0.2082 against
+        0.1907 whole-clip.
+        """
+        n = len(waves)
+        if not bursts or not config.BON_BURST_READY or self.clap is None:
+            return [None] * n
+        try:
+            import torch
+            self.clap._load()
+            if not self._load_heads():
+                return [None] * n
+            cls, fam = Judge._hcls, Judge._hfam
+            nb = cls.index("no_burst")
+            win = int(config.BON_BURST_WIN_S * 16000)
+            hop = max(1, int(config.BON_BURST_HOP_S * 16000))
+            out = []
+            for w in waves:
+                x = np.asarray(w, np.float32).reshape(-1)
+                m = (len(x) // 3) * 3
+                x16 = x[:m].reshape(-1, 3).mean(1)
+                vals = []
+                for lab, t in bursts:
+                    lo = max(0, int((t - 1.0) * 16000))
+                    hi = min(len(x16), int((t + 2.0) * 16000) + win)
+                    segs = [x16[a:a + win]
+                            for a in range(lo, max(lo + 1, hi - win + 1), hop)
+                            if a + win <= len(x16)]
+                    if not segs:
+                        continue
+                    with torch.no_grad():
+                        e = torch.stack([
+                            self.clap.model.encode_waveform(
+                                torch.tensor(g, dtype=torch.float32,
+                                             device=self.clap.device)[None],
+                                sample_rate=16000)[0].float() for g in segs])
+                        if e.shape[0] == 1:      # BatchNorm refuses one row
+                            e = torch.cat([e, e], 0)
+                            p = torch.stack([torch.softmax(h(e), -1)
+                                             for h in Judge._heads]).mean(0)[:1]
+                        else:
+                            p = torch.stack([torch.softmax(h(e), -1)
+                                             for h in Judge._heads]).mean(0)
+                    p = p.cpu().numpy()
+                    idx, family = _resolve_burst(lab, cls, fam)
+                    fi = [i for i, f in enumerate(fam) if f == family] \
+                        if family else []
+                    s_strict = float(p[:, idx].max()) if idx is not None else 0.0
+                    s_fam = float(p[:, fi].sum(1).max()) if fi else s_strict
+                    s_pres = float((1.0 - p[:, nb]).max())
+                    agree = 1.0 if any(int(k) in fi for k in p.argmax(1)) else 0.0
+                    vals.append(s_strict + 0.5 * (s_fam - s_strict)
+                                + 0.25 * s_pres + 0.5 * agree)
+                out.append(float(np.mean(vals)) if vals else None)
+            return out
+        except Exception as e:
+            print(f"[burst] scoring skipped: {type(e).__name__}: {e}",
+                  flush=True)
+            return [None] * n
+
     def want_vector(self, general, script):
         """The centred text embedding of what was asked for."""
         if self.clap is None:
@@ -251,10 +421,9 @@ class Judge:
         # `rank` then forces the term to exactly 0.
         try:
             import timed_script as _ts
-            import burst_client as _bc
             _bursts = _ts.burst_onsets(tagged or "")
             if _bursts:
-                for c, v in zip(out, _bc.score(waves, sr, _bursts)):
+                for c, v in zip(out, self.burst_scores(waves, sr, _bursts)):
                     if v is not None:
                         c["burst"] = v
         except Exception as e:
